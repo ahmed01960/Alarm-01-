@@ -1,0 +1,670 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0B6E75">
+<meta name="color-scheme" content="light dark">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="مؤقّتاتي">
+<title>مؤقّتاتي</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans+Arabic:wght@400;500;600&family=Reem+Kufi:wght@500;700&display=swap">
+<style>html,body{margin:0}html{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}</style>
+<style>
+/* Layout: one narrow column of task cards under a live-clock header; creation and editing happen in a bottom sheet. */
+:root {
+  --bg: #E8EEED;
+  --surface: #F7FAF9;
+  --surface-2: #DDE8E6;
+  --fg: #11262B;
+  --muted: #566C70;
+  --line: #C6D6D4;
+  --accent: #0B6E75;
+  --accent-fg: #F4FBFA;
+  --accent-soft: #CFE7E6;
+  --alert: #B4412A;
+  --alert-soft: #F4DDD6;
+  --shadow: 0 10px 30px rgba(17, 38, 43, .18);
+  --f-display: 'Reem Kufi', 'IBM Plex Sans Arabic', system-ui, sans-serif;
+  --f-body: 'IBM Plex Sans Arabic', system-ui, sans-serif;
+  --f-mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0C181B; --surface: #132327; --surface-2: #1B3036; --fg: #E2EEEC; --muted: #90A8AA;
+    --line: #243A3F; --accent: #4FC3C7; --accent-fg: #06191B; --accent-soft: #163A3E;
+    --alert: #F28C6D; --alert-soft: #3E2119; --shadow: 0 10px 30px rgba(0, 0, 0, .5);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0C181B; --surface: #132327; --surface-2: #1B3036; --fg: #E2EEEC; --muted: #90A8AA;
+  --line: #243A3F; --accent: #4FC3C7; --accent-fg: #06191B; --accent-soft: #163A3E;
+  --alert: #F28C6D; --alert-soft: #3E2119; --shadow: 0 10px 30px rgba(0, 0, 0, .5);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--fg); font-family: var(--f-body); font-size: 15px; line-height: 1.6;
+  padding-block: 20px 48px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.app { max-width: 560px; margin-inline: auto; display: flex; flex-direction: column; gap: 16px; }
+button, input, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+header { display: flex; flex-direction: column; gap: 4px; }
+.top { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+h1 { margin: 0; font-family: var(--f-display); font-weight: 700; font-size: 2.1rem; line-height: 1.2; }
+.now { font-family: var(--f-mono); font-weight: 500; font-size: 1rem; color: var(--muted); font-variant-numeric: tabular-nums; direction: ltr; }
+.summary { margin: 0; color: var(--muted); font-size: .9rem; }
+
+.btn { border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 8px 14px; min-height: 40px; font-weight: 500; font-size: .9rem; }
+.btn:hover { background: var(--surface-2); }
+.btn.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+.btn.primary:hover { filter: brightness(1.08); }
+.btn.danger { color: var(--alert); }
+.btn.danger.armed { background: var(--alert); color: var(--accent-fg); border-color: var(--alert); }
+.btn.add { width: 100%; min-height: 48px; font-size: 1rem; }
+.notif { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; background: var(--accent-soft); border-radius: 12px; padding: 10px 14px; font-size: .88rem; }
+
+.tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+.tab { border: 1px solid var(--line); background: transparent; border-radius: 999px; padding: 4px 14px; font-size: .85rem; color: var(--muted); }
+.tab[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+
+.list { display: flex; flex-direction: column; gap: 12px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.card.due { border-color: var(--alert); background: linear-gradient(var(--alert-soft), var(--alert-soft)) , var(--surface); background-blend-mode: normal; }
+.meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.chip { font-size: .75rem; font-weight: 600; letter-spacing: .02em; padding: 2px 10px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); }
+.status { font-size: .8rem; color: var(--muted); }
+.status.s-run { color: var(--accent); font-weight: 600; }
+.status.s-due { color: var(--alert); font-weight: 600; }
+.card h3 { margin: 0; font-family: var(--f-display); font-size: 1.25rem; font-weight: 700; line-height: 1.35; overflow-wrap: anywhere; }
+.note { margin: 0; color: var(--muted); font-size: .9rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+.readout { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.clock { font-family: var(--f-mono); font-weight: 600; font-size: 2.3rem; line-height: 1.2; font-variant-numeric: tabular-nums; direction: ltr; letter-spacing: -.01em; }
+.card.due .clock { color: var(--alert); }
+.days { font-size: .9rem; color: var(--muted); }
+.sub { font-size: .82rem; color: var(--muted); }
+.bar { height: 5px; border-radius: 3px; background: var(--surface-2); overflow: hidden; }
+.bar > i { display: block; height: 100%; width: 0; background: var(--accent); }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.empty { text-align: center; color: var(--muted); padding: 32px 12px; border: 1px dashed var(--line); border-radius: 14px; }
+
+.overlay { position: fixed; inset: 0; background: rgba(6, 18, 20, .55); display: flex; align-items: flex-end; justify-content: center; z-index: 20; }
+.sheet { background: var(--surface); width: 100%; max-width: 560px; max-height: 92dvh; overflow-y: auto; border-radius: 20px 20px 0 0; box-shadow: var(--shadow);
+  padding-top: 20px; padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex; flex-direction: column; gap: 14px; }
+.sheet h2 { margin: 0; font-family: var(--f-display); font-size: 1.4rem; }
+.field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.field > label, .field > span.lbl { font-size: .82rem; font-weight: 600; color: var(--muted); }
+input[type="text"], input[type="number"], input[type="datetime-local"], textarea {
+  width: 100%; min-width: 0; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; min-height: 44px; }
+textarea { resize: vertical; min-height: 72px; }
+.seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 4px; }
+.seg label { text-align: center; padding: 8px 4px; border-radius: 8px; font-size: .88rem; cursor: pointer; color: var(--muted); }
+.seg input { position: absolute; opacity: 0; pointer-events: none; }
+.seg input:checked + span { color: var(--accent-fg); }
+.seg label:has(input:checked) { background: var(--accent); color: var(--accent-fg); font-weight: 600; }
+.seg label:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+.dur { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.dur .field > label { text-align: center; }
+.dur input { text-align: center; font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+.presets { display: flex; gap: 6px; flex-wrap: wrap; }
+.hint { margin: 0; font-size: .8rem; color: var(--muted); }
+.err { margin: 0; font-size: .85rem; color: var(--alert); min-height: 1.2em; }
+.row { display: flex; gap: 8px; }
+.row .btn { flex: 1; }
+
+.toast { position: fixed; z-index: 30; left: 50%; transform: translateX(-50%); bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+  background: var(--fg); color: var(--bg); padding: 10px 16px; border-radius: 12px; font-size: .9rem; max-width: calc(100% - 32px); box-shadow: var(--shadow); }
+.btn, .tab { transition: background-color .15s, transform .08s, filter .15s; }
+.btn:active, .tab:active { transform: scale(.94); }
+.top2 { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.snd { min-height: 32px; padding: 2px 12px; border-radius: 999px; font-size: .8rem; }
+.snd[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); border-color: transparent; font-weight: 600; }
+.status.s-run::before, .status.s-due::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-inline-end: 6px; }
+.status.s-run::before { background: var(--accent); }
+.status.s-due::before { background: var(--alert); }
+.card.ringing { border-color: var(--alert); box-shadow: 0 0 0 3px var(--alert-soft); }
+.ring { position: fixed; z-index: 40; top: calc(10px + env(safe-area-inset-top, 0px));
+  left: max(16px, env(safe-area-inset-left, 0px)); right: max(16px, env(safe-area-inset-right, 0px)); max-width: 528px; margin-inline: auto;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  background: var(--alert); color: var(--accent-fg); border-radius: 14px; padding: 12px 14px; font-weight: 600; box-shadow: var(--shadow); }
+.ring[hidden] { display: none; }
+.ring .btn { background: transparent; color: inherit; border-color: currentColor; flex-shrink: 0; }
+@media (prefers-reduced-motion: no-preference) {
+  .sheet { animation: rise .22s ease-out; }
+  .card.enter { animation: pop .32s ease-out; }
+  @keyframes pop { from { transform: translateY(12px) scale(.97); opacity: 0; } to { transform: none; opacity: 1; } }
+  .status.s-run::before { animation: pulse 1.4s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: .25; transform: scale(.65); } }
+  .card.ringing { animation: glow 1s ease-in-out infinite; }
+  @keyframes glow { 50% { box-shadow: 0 0 0 7px var(--alert-soft); } }
+  .ring { animation: drop .25s ease-out; }
+  @keyframes drop { from { transform: translateY(-16px); opacity: 0; } to { transform: none; opacity: 1; } }
+  .bar > i { transition: width .3s linear; }
+  @keyframes rise { from { transform: translateY(24px); opacity: .6; } to { transform: none; opacity: 1; } }
+}
+</style>
+</head>
+<body>
+<div class="app" dir="rtl" lang="ar">
+  <header>
+    <div class="top">
+      <h1>مؤقّتاتي</h1>
+      <div class="now" id="now" aria-label="الوقت الآن"></div>
+    </div>
+    <div class="top2">
+      <p class="summary" id="summary"></p>
+      <button class="btn snd" id="sndBtn" type="button" aria-pressed="true">صوت وهزّ: يعمل</button>
+    </div>
+  </header>
+
+  <div class="notif" id="notif" hidden>
+    <span>فعّل التنبيهات علشان توصلك رسالة وقت ما يحين الموعد والتطبيق مفتوح.</span>
+    <button class="btn" id="notifBtn" type="button">تفعيل</button>
+  </div>
+
+  <button class="btn primary add" id="addBtn" type="button">+ مهمة جديدة</button>
+
+  <div class="tabs" id="tabs" role="group" aria-label="تصفية المهام">
+    <button class="tab" type="button" data-f="all" aria-pressed="true">الكل</button>
+    <button class="tab" type="button" data-f="date" aria-pressed="false">مواعيد</button>
+    <button class="tab" type="button" data-f="countdown" aria-pressed="false">مؤقّتات</button>
+    <button class="tab" type="button" data-f="stopwatch" aria-pressed="false">ساعات إيقاف</button>
+  </div>
+
+  <main class="list" id="list"></main>
+</div>
+
+<div class="overlay" id="overlay" hidden>
+  <form class="sheet" id="form" dir="rtl" lang="ar" novalidate role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+    <h2 id="sheetTitle">مهمة جديدة</h2>
+
+    <div class="field">
+      <label for="fName">اسم المهمة</label>
+      <input type="text" id="fName" maxlength="80" autocomplete="off" placeholder="مثلًا: فتح التطبيق">
+    </div>
+    <div class="field">
+      <label for="fNote">ملاحظة</label>
+      <textarea id="fNote" maxlength="500" placeholder="اختياري"></textarea>
+    </div>
+
+    <div class="field">
+      <span class="lbl" id="modeLbl">طريقة حساب الوقت</span>
+      <div class="seg" role="radiogroup" aria-labelledby="modeLbl">
+        <label><input type="radio" name="mode" value="date"><span>موعد محدد</span></label>
+        <label><input type="radio" name="mode" value="countdown"><span>مؤقّت تنازلي</span></label>
+        <label><input type="radio" name="mode" value="stopwatch"><span>ساعة إيقاف</span></label>
+      </div>
+      <p class="hint">تغيير الطريقة يحافظ على الاسم والملاحظة. العدّاد نفسه يبدأ من جديد.</p>
+    </div>
+
+    <div class="field" id="secDate">
+      <label for="fDate">الموعد</label>
+      <input type="datetime-local" id="fDate">
+    </div>
+
+    <div id="secCount" hidden>
+      <div class="field">
+        <span class="lbl">المدة</span>
+        <div class="dur">
+          <div class="field"><label for="fH">ساعات</label><input type="number" id="fH" min="0" max="999" inputmode="numeric"></div>
+          <div class="field"><label for="fM">دقائق</label><input type="number" id="fM" min="0" max="59" inputmode="numeric"></div>
+          <div class="field"><label for="fS">ثواني</label><input type="number" id="fS" min="0" max="59" inputmode="numeric"></div>
+        </div>
+      </div>
+      <div class="presets" style="margin-top:8px">
+        <button class="btn" type="button" data-p="300">5 د</button>
+        <button class="btn" type="button" data-p="900">15 د</button>
+        <button class="btn" type="button" data-p="1800">30 د</button>
+        <button class="btn" type="button" data-p="3600">ساعة</button>
+        <button class="btn" type="button" data-p="7200">ساعتان</button>
+      </div>
+    </div>
+
+    <p class="hint" id="secStop" hidden>تبدأ ساعة الإيقاف من صفر وتعدّ للأعلى لحد ما توقفها.</p>
+
+    <p class="err" id="err" role="alert"></p>
+    <div class="row">
+      <button class="btn primary" type="submit">حفظ</button>
+      <button class="btn" type="button" id="cancelBtn">إلغاء</button>
+    </div>
+  </form>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+<div class="ring" id="ring" role="alert" hidden>
+  <span id="ringTxt"></span>
+  <button class="btn" id="ringStop" type="button">إيقاف</button>
+</div>
+
+<script>
+(function () {
+  var KEY = 'mawaqitati.v1';
+  var MODES = { date: 'موعد', countdown: 'مؤقّت', stopwatch: 'ساعة إيقاف' };
+  var tasks = [];
+  var filter = 'all';
+  var editingId = null;
+  var armedId = null, armedTimer = null, toastTimer = null;
+  var enterId = null, ringing = {}, ringTimer = null, ringCount = 0, lastSec = {};
+  var soundOn = true;
+  try { soundOn = localStorage.getItem(KEY + '.sound') !== '0'; } catch (e) {}
+
+  /* ---------- sound + haptics (Web Audio, no files) ---------- */
+  var ac = null;
+  function audio() {
+    try {
+      if (!ac) { var C = window.AudioContext || window.webkitAudioContext; if (C) ac = new C(); }
+      if (ac && ac.state === 'suspended') ac.resume();
+    } catch (e) { ac = null; }
+    return ac;
+  }
+  function tone(freq, start, dur, type, vol) {
+    var a = audio(); if (!a) return;
+    var t0 = a.currentTime + start;
+    var o = a.createOscillator(), g = a.createGain();
+    o.type = type || 'sine'; o.frequency.value = freq;
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol || 0.2, t0 + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g); g.connect(a.destination);
+    o.start(t0); o.stop(t0 + dur + 0.02);
+  }
+  var SFX = {
+    tap: function () { tone(660, 0, .06, 'sine', .12); },
+    start: function () { tone(523, 0, .1, 'sine', .2); tone(784, .09, .16, 'sine', .2); },
+    pause: function () { tone(784, 0, .1, 'sine', .2); tone(523, .09, .16, 'sine', .2); },
+    renew: function () { tone(440, 0, .08, 'triangle', .2); tone(587, .08, .08, 'triangle', .2); tone(880, .16, .16, 'triangle', .2); },
+    reset: function () { tone(500, 0, .08, 'sine', .18); tone(350, .08, .14, 'sine', .18); },
+    del: function () { tone(220, 0, .18, 'sawtooth', .1); },
+    save: function () { tone(660, 0, .08, 'sine', .2); tone(880, .08, .08, 'sine', .2); tone(1175, .16, .18, 'sine', .2); },
+    tick: function () { tone(1000, 0, .05, 'square', .06); },
+    alarm: function () { for (var i = 0; i < 3; i++) { tone(988, i * .22, .14, 'square', .12); tone(1319, i * .22 + .09, .12, 'square', .12); } }
+  };
+  function fx(name, vib) {
+    if (!soundOn) return;
+    try { SFX[name](); } catch (e) {}
+    try { if (vib && navigator.vibrate) navigator.vibrate(vib); } catch (e) {}
+  }
+
+  /* ---------- alarm banner ---------- */
+  function showRing() {
+    var ids = Object.keys(ringing);
+    if (!ids.length) { $('ring').hidden = true; return; }
+    $('ringTxt').textContent = ids.length === 1 ? ringing[ids[0]] : ids.length + ' مهام حان وقتها';
+    $('ring').hidden = false;
+  }
+  function stopSound() { clearInterval(ringTimer); ringTimer = null; }
+  function startRing(t, msg) {
+    ringing[t.id] = msg;
+    showRing();
+    if (soundOn && !ringTimer) {
+      ringCount = 0;
+      SFX.alarm();
+      try { if (navigator.vibrate) navigator.vibrate([200, 100, 200]); } catch (e) {}
+      ringTimer = setInterval(function () {
+        ringCount++;
+        if (ringCount > 20 || !soundOn) { stopSound(); return; }
+        SFX.alarm();
+        try { if (navigator.vibrate) navigator.vibrate([200, 100, 200]); } catch (e) {}
+      }, 1800);
+    }
+  }
+  function clearRing(id) {
+    if (!ringing[id]) return;
+    delete ringing[id];
+    if (!Object.keys(ringing).length) stopSound();
+    showRing();
+  }
+  function dismissRing() { stopSound(); ringing = {}; showRing(); render(); }
+
+  function $(id) { return document.getElementById(id); }
+  function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+  function mk(o) {
+    return Object.assign({ id: uid(), name: '', note: '', mode: 'countdown', target: null, duration: 1800000,
+      state: 'idle', startedAt: 0, acc: 0, notified: false, created: Date.now() }, o);
+  }
+
+  function load() {
+    try {
+      var raw = localStorage.getItem(KEY);
+      if (raw) { var d = JSON.parse(raw); if (d && Array.isArray(d.tasks)) { tasks = d.tasks; return true; } }
+    } catch (e) {}
+    return false;
+  }
+  function save() { try { localStorage.setItem(KEY, JSON.stringify({ tasks: tasks })); } catch (e) {} }
+
+  function seed() {
+    var d = new Date(); d.setDate(d.getDate() + 1); d.setHours(11, 0, 0, 0);
+    var t0 = Date.now();
+    tasks = [
+      mk({ name: 'فتح التطبيق', note: 'مثال جاهز: موعد الساعة 11:00 صباح الغد. عدّله أو احذفه.', mode: 'date', target: d.getTime(), created: t0 + 2 }),
+      mk({ name: 'جلسة مذاكرة', note: 'مثال جاهز: مؤقّت تنازلي 30 دقيقة.', mode: 'countdown', duration: 1800000, created: t0 + 1 }),
+      mk({ name: 'قراءة', note: 'مثال جاهز: ساعة إيقاف تعدّ الوقت المستغرق.', mode: 'stopwatch', created: t0 })
+    ];
+    save();
+  }
+
+  /* ---------- time math ---------- */
+  function elapsed(t, now) { return t.acc + (t.state === 'running' ? now - t.startedAt : 0); }
+  function pad(n) { return String(n).padStart(2, '0'); }
+  function split(ms) {
+    var s = Math.max(0, Math.floor(ms / 1000));
+    return { d: Math.floor(s / 86400), h: Math.floor((s % 86400) / 3600), m: Math.floor((s % 3600) / 60), s: s % 60 };
+  }
+  function hms(p) { return pad(p.h) + ':' + pad(p.m) + ':' + pad(p.s); }
+  function daysText(p) { return p.d ? 'و ' + p.d + ' يوم' : ''; }
+  var dateFmt = new Intl.DateTimeFormat('ar-EG-u-nu-latn', { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
+  var clockFmt = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+  function view(t, now) {
+    var v = { ms: 0, label: '', status: '', cls: '', due: false, progress: null, sub: '' };
+    if (t.mode === 'date') {
+      var diff = t.target - now;
+      v.due = diff <= 0;
+      v.ms = Math.abs(diff);
+      v.label = v.due ? 'مضى على الموعد' : 'باقي على الموعد';
+      v.status = v.due ? 'حان الموعد' : 'بانتظار الموعد';
+      v.cls = v.due ? 's-due' : 's-run';
+      v.sub = 'الموعد: ' + dateFmt.format(new Date(t.target));
+    } else if (t.mode === 'countdown') {
+      var el = Math.min(elapsed(t, now), t.duration);
+      var rem = t.duration - el;
+      v.due = t.state === 'done' || rem <= 0;
+      v.ms = Math.ceil(rem / 1000) * 1000;
+      v.progress = t.duration ? el / t.duration : 1;
+      var dp = split(t.duration);
+      v.sub = 'المدة: ' + (dp.d * 24 + dp.h) + ' س ' + dp.m + ' د ' + dp.s + ' ث';
+      if (v.due) { v.label = 'انتهى الوقت'; v.status = 'انتهى'; v.cls = 's-due'; }
+      else if (t.state === 'running') { v.label = 'باقي'; v.status = 'شغّال'; v.cls = 's-run'; }
+      else if (t.state === 'paused') { v.label = 'باقي (متوقّف)'; v.status = 'متوقّف مؤقتًا'; }
+      else { v.label = 'جاهز للبدء'; v.status = 'جاهز'; }
+    } else {
+      v.ms = elapsed(t, now);
+      if (t.state === 'running') { v.label = 'المدة المستغرقة'; v.status = 'شغّال'; v.cls = 's-run'; }
+      else if (t.state === 'paused') { v.label = 'المدة المستغرقة (متوقّفة)'; v.status = 'متوقّفة'; }
+      else { v.label = 'جاهزة للبدء'; v.status = 'جاهزة'; }
+    }
+    return v;
+  }
+
+  /* ---------- actions ---------- */
+  function find(id) { for (var i = 0; i < tasks.length; i++) if (tasks[i].id === id) return tasks[i]; return null; }
+  function start(t) { t.state = 'running'; t.startedAt = Date.now(); }
+  function pause(t) { t.acc += Date.now() - t.startedAt; t.state = 'paused'; }
+  function renew(t) { t.acc = 0; t.notified = false; start(t); }
+  function reset(t) { t.acc = 0; t.state = 'idle'; t.notified = false; }
+
+  function act(id, what) {
+    var t = find(id); if (!t) return;
+    if (what === 'start' || what === 'resume') { start(t); clearRing(id); fx('start', 15); }
+    else if (what === 'pause') { pause(t); fx('pause', 15); }
+    else if (what === 'renew') { renew(t); clearRing(id); delete lastSec[id]; fx('renew', 20); }
+    else if (what === 'reset') { reset(t); fx('reset', 15); }
+    else if (what === 'edit') { fx('tap'); openSheet(id); return; }
+    else if (what === 'delete') {
+      if (armedId !== id) {
+        armedId = id; clearTimeout(armedTimer);
+        armedTimer = setTimeout(function () { armedId = null; render(); }, 3000);
+        fx('tap', 10);
+        render(); return;
+      }
+      tasks = tasks.filter(function (x) { return x.id !== id; });
+      armedId = null; clearRing(id); fx('del', 30);
+    }
+    save(); render();
+  }
+
+  /* ---------- rendering ---------- */
+  function h(tag, attrs, kids) {
+    var el = document.createElement(tag);
+    for (var k in (attrs || {})) {
+      if (k === 'text') el.textContent = attrs[k];
+      else if (k === 'class') el.className = attrs[k];
+      else el.setAttribute(k, attrs[k]);
+    }
+    (kids || []).forEach(function (c) { if (c) el.appendChild(c); });
+    return el;
+  }
+  function btn(label, what, id, cls) {
+    var b = h('button', { type: 'button', class: 'btn' + (cls ? ' ' + cls : ''), text: label, 'data-act': what, 'data-id': id });
+    return b;
+  }
+
+  function card(t, now) {
+    var v = view(t, now);
+    var el = h('article', { class: 'card' + (v.due ? ' due' : '') + (ringing[t.id] ? ' ringing' : '') + (t.id === enterId ? ' enter' : ''), 'data-id': t.id });
+    el.appendChild(h('div', { class: 'meta' }, [
+      h('span', { class: 'chip', text: MODES[t.mode] }),
+      h('span', { class: 'status ' + v.cls, 'data-k': 'status', text: v.status })
+    ]));
+    el.appendChild(h('h3', { text: t.name }));
+    if (t.note) el.appendChild(h('p', { class: 'note', text: t.note }));
+    var p = split(v.ms);
+    el.appendChild(h('div', { class: 'readout' }, [
+      h('div', { class: 'clock', 'data-k': 'clock', text: hms(p) }),
+      h('span', { class: 'days', 'data-k': 'days', text: daysText(p) })
+    ]));
+    el.appendChild(h('div', { class: 'sub' }, [
+      h('span', { 'data-k': 'label', text: v.label }),
+      h('span', { text: ' · ' + v.sub })
+    ]));
+    if (v.progress !== null) {
+      var bar = h('div', { class: 'bar', role: 'presentation' }, [h('i', { 'data-k': 'bar' })]);
+      bar.firstChild.style.width = Math.round(v.progress * 100) + '%';
+      el.appendChild(bar);
+    }
+    var a = h('div', { class: 'actions' });
+    if (t.mode === 'countdown') {
+      if (t.state === 'idle') a.appendChild(btn('بدء', 'start', t.id, 'primary'));
+      if (t.state === 'running') a.appendChild(btn('إيقاف', 'pause', t.id, 'primary'));
+      if (t.state === 'paused') a.appendChild(btn('استكمال', 'resume', t.id, 'primary'));
+      if (t.state === 'done') a.appendChild(btn('تجديد', 'renew', t.id, 'primary'));
+      else if (t.state !== 'idle') a.appendChild(btn('تجديد', 'renew', t.id));
+    } else if (t.mode === 'stopwatch') {
+      if (t.state === 'idle') a.appendChild(btn('بدء', 'start', t.id, 'primary'));
+      if (t.state === 'running') a.appendChild(btn('إيقاف', 'pause', t.id, 'primary'));
+      if (t.state === 'paused') a.appendChild(btn('استكمال', 'resume', t.id, 'primary'));
+      if (t.state !== 'idle') a.appendChild(btn('تصفير', 'reset', t.id));
+    }
+    a.appendChild(btn(t.mode === 'date' ? 'تعديل الموعد' : 'تعديل', 'edit', t.id));
+    a.appendChild(btn(armedId === t.id ? 'تأكيد الحذف' : 'حذف', 'delete', t.id, 'danger' + (armedId === t.id ? ' armed' : '')));
+    el.appendChild(a);
+    return el;
+  }
+
+  function render() {
+    var now = Date.now();
+    var list = $('list');
+    var shown = tasks.slice().sort(function (a, b) { return b.created - a.created; })
+      .filter(function (t) { return filter === 'all' || t.mode === filter; });
+    list.replaceChildren();
+    if (!shown.length) {
+      list.appendChild(h('div', { class: 'empty', text: tasks.length ? 'مفيش مهام في التصنيف ده.' : 'لسه مفيش مهام. اضغط «مهمة جديدة» وابدأ.' }));
+    } else {
+      shown.forEach(function (t) { list.appendChild(card(t, now)); });
+    }
+    enterId = null;
+    var running = tasks.filter(function (t) { return t.state === 'running' || (t.mode === 'date' && t.target > now); }).length;
+    $('summary').textContent = tasks.length + ' مهام · ' + running + ' جارية';
+  }
+
+  /* ---------- tick ---------- */
+  function notify(t) {
+    var msg = t.name + ' — ' + (t.mode === 'date' ? 'حان الموعد' : 'انتهى الوقت');
+    startRing(t, msg);
+    try { if ('Notification' in window && Notification.permission === 'granted') new Notification('مؤقّتاتي', { body: msg }); } catch (e) {}
+  }
+
+  function tick() {
+    var now = Date.now(), changed = false;
+    $('now').textContent = clockFmt.format(new Date(now));
+    tasks.forEach(function (t) {
+      if (t.mode === 'countdown' && t.state === 'running' && elapsed(t, now) >= t.duration) {
+        t.acc = t.duration; t.state = 'done'; changed = true;
+      }
+      if (t.mode === 'countdown' && t.state === 'running') {
+        var left = Math.ceil((t.duration - elapsed(t, now)) / 1000);
+        if (left >= 1 && left <= 3 && lastSec[t.id] !== left) { lastSec[t.id] = left; fx('tick'); }
+      }
+      var due = (t.mode === 'date' && now >= t.target) || (t.mode === 'countdown' && t.state === 'done');
+      if (due && !t.notified) { t.notified = true; changed = true; notify(t); }
+    });
+    if (changed) { save(); render(); return; }
+    var cards = document.querySelectorAll('.card');
+    for (var i = 0; i < cards.length; i++) {
+      var el = cards[i], t = find(el.getAttribute('data-id')); if (!t) continue;
+      var v = view(t, now), p = split(v.ms);
+      el.querySelector('[data-k="clock"]').textContent = hms(p);
+      el.querySelector('[data-k="days"]').textContent = daysText(p);
+      el.querySelector('[data-k="label"]').textContent = v.label;
+      var bar = el.querySelector('[data-k="bar"]');
+      if (bar && v.progress !== null) bar.style.width = Math.round(v.progress * 100) + '%';
+    }
+  }
+
+  /* ---------- sheet ---------- */
+  function toLocalInput(ms) {
+    var d = new Date(ms);
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+  }
+  function currentMode() { return document.querySelector('input[name="mode"]:checked').value; }
+  function showMode() {
+    var m = currentMode();
+    $('secDate').hidden = m !== 'date';
+    $('secCount').hidden = m !== 'countdown';
+    $('secStop').hidden = m !== 'stopwatch';
+  }
+  function setDur(sec) {
+    $('fH').value = Math.floor(sec / 3600); $('fM').value = Math.floor((sec % 3600) / 60); $('fS').value = sec % 60;
+  }
+  function openSheet(id) {
+    editingId = id;
+    var t = id ? find(id) : null;
+    $('sheetTitle').textContent = t ? 'تعديل المهمة' : 'مهمة جديدة';
+    $('fName').value = t ? t.name : '';
+    $('fNote').value = t ? t.note : '';
+    var mode = t ? t.mode : 'countdown';
+    document.querySelector('input[name="mode"][value="' + mode + '"]').checked = true;
+    var target = t && t.target ? t.target : (function () { var d = new Date(); d.setHours(d.getHours() + 1, 0, 0, 0); return d.getTime(); })();
+    $('fDate').value = toLocalInput(target);
+    setDur(Math.round((t ? t.duration : 1800000) / 1000));
+    $('err').textContent = '';
+    showMode();
+    $('overlay').hidden = false;
+    $('fName').focus();
+  }
+  function closeSheet() { $('overlay').hidden = true; editingId = null; $('addBtn').focus(); }
+
+  function submit(e) {
+    e.preventDefault();
+    var name = $('fName').value.trim();
+    var note = $('fNote').value.trim();
+    var mode = currentMode();
+    if (!name) { $('err').textContent = 'اكتب اسم المهمة الأول.'; $('fName').focus(); return; }
+    var target = null, duration = null;
+    if (mode === 'date') {
+      target = new Date($('fDate').value).getTime();
+      if (!isFinite(target)) { $('err').textContent = 'اختار تاريخ ووقت صحيحين للموعد.'; $('fDate').focus(); return; }
+    }
+    if (mode === 'countdown') {
+      var hh = parseInt($('fH').value, 10) || 0, mm = parseInt($('fM').value, 10) || 0, ss = parseInt($('fS').value, 10) || 0;
+      duration = ((hh * 60 + mm) * 60 + ss) * 1000;
+      if (duration <= 0) { $('err').textContent = 'حدّد مدة أكبر من صفر.'; $('fM').focus(); return; }
+    }
+    var t = editingId ? find(editingId) : null;
+    var isNew = !t;
+    if (!t) { t = mk({}); tasks.push(t); }
+    var modeChanged = t.mode !== mode;
+    var durChanged = mode === 'countdown' && t.duration !== duration;
+    var targetChanged = mode === 'date' && t.target !== target;
+    t.name = name; t.note = note; t.mode = mode;
+    if (mode === 'date') t.target = target;
+    if (mode === 'countdown') t.duration = duration;
+    if (modeChanged || durChanged || targetChanged) { t.acc = 0; t.state = 'idle'; t.startedAt = 0; t.notified = false; }
+    clearRing(t.id); enterId = isNew ? t.id : null; fx('save', 20);
+    save(); closeSheet(); render(); tick();
+  }
+
+  function toast(msg) {
+    var el = $('toast'); el.textContent = msg; el.hidden = false;
+    clearTimeout(toastTimer); toastTimer = setTimeout(function () { el.hidden = true; }, 5000);
+  }
+
+  /* ---------- wiring ---------- */
+  $('list').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-act]'); if (!b) return;
+    act(b.getAttribute('data-id'), b.getAttribute('data-act'));
+  });
+  function paintSnd() {
+    var b = $('sndBtn');
+    b.setAttribute('aria-pressed', String(soundOn));
+    b.textContent = 'صوت وهزّ: ' + (soundOn ? 'يعمل' : 'مغلق');
+  }
+  paintSnd();
+  $('sndBtn').addEventListener('click', function () {
+    soundOn = !soundOn;
+    try { localStorage.setItem(KEY + '.sound', soundOn ? '1' : '0'); } catch (e) {}
+    if (!soundOn) stopSound();
+    paintSnd();
+    fx('tap', 10);
+  });
+  $('ringStop').addEventListener('click', dismissRing);
+  document.addEventListener('pointerdown', function () { if (soundOn) audio(); }, { once: true });
+  $('addBtn').addEventListener('click', function () { fx('tap'); openSheet(null); });
+  $('cancelBtn').addEventListener('click', function () { fx('tap'); closeSheet(); });
+  $('form').addEventListener('submit', submit);
+  $('overlay').addEventListener('mousedown', function (e) { if (e.target === $('overlay')) closeSheet(); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !$('overlay').hidden) closeSheet(); });
+  document.querySelectorAll('input[name="mode"]').forEach(function (r) { r.addEventListener('change', function () { fx('tap', 8); showMode(); }); });
+  document.querySelectorAll('.presets [data-p]').forEach(function (b) {
+    b.addEventListener('click', function () { fx('tap', 8); setDur(parseInt(b.getAttribute('data-p'), 10)); });
+  });
+  $('tabs').addEventListener('click', function (e) {
+    var b = e.target.closest('.tab'); if (!b) return;
+    fx('tap', 8);
+    filter = b.getAttribute('data-f');
+    document.querySelectorAll('.tab').forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); });
+    render();
+  });
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) tick(); });
+
+  try {
+    if ('Notification' in window && Notification.permission === 'default') {
+      $('notif').hidden = false;
+      $('notifBtn').addEventListener('click', function () {
+        try {
+          Notification.requestPermission().then(function (p) {
+            $('notif').hidden = true;
+            toast(p === 'granted' ? 'تم تفعيل التنبيهات.' : 'التنبيهات غير مفعّلة. هتشوف الرسائل داخل التطبيق فقط.');
+          }).catch(function () { $('notif').hidden = true; });
+        } catch (e) { $('notif').hidden = true; }
+      });
+    }
+  } catch (e) {}
+
+  if (!load()) seed();
+  render();
+  tick();
+  setInterval(tick, 250);
+})();
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function () {
+    navigator.serviceWorker.register('sw.js').catch(function () {});
+  });
+}
+</script>
+</body>
+</html>
