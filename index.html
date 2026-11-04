@@ -6,8 +6,8 @@
 <meta name="theme-color" content="#0B6E75">
 <meta name="color-scheme" content="light dark">
 <link rel="manifest" href="manifest.json">
-<link rel="icon" href="icons/icon-192.png">
-<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="مؤقّتاتي">
@@ -48,6 +48,11 @@
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
+.quick { display: flex; gap: 6px; flex-wrap: wrap; }
+.quick .btn { flex: 1 1 auto; min-height: 42px; padding: 6px 10px; }
+.sheet-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.btn.x { width: 44px; min-height: 44px; padding: 0; font-size: 1.6rem; line-height: 1; border-radius: 50%; }
 body {
   background: var(--bg); color: var(--fg); font-family: var(--f-body); font-size: 15px; line-height: 1.6;
   padding-block: 20px 48px;
@@ -119,6 +124,21 @@ textarea { resize: vertical; min-height: 72px; }
 .dur .field > label { text-align: center; }
 .dur input { text-align: center; font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
 .presets { display: flex; gap: 6px; flex-wrap: wrap; }
+.wheels { display: flex; gap: 6px; direction: ltr; }
+.wcol { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.wl { text-align: center; font-size: .78rem; color: var(--muted); font-weight: 600; min-height: 1.2em; }
+.wwrap { position: relative; }
+.wwrap::before { content: ""; position: absolute; left: 0; right: 0; top: calc(50% - 20px); height: 40px; border-radius: 10px; background: var(--accent-soft); }
+.wheel { position: relative; height: 200px; overflow-y: auto; scroll-snap-type: y mandatory; overscroll-behavior: contain; touch-action: pan-y;
+  scrollbar-width: none; padding-block: 80px;
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 28%, #000 72%, transparent);
+  mask-image: linear-gradient(to bottom, transparent, #000 28%, #000 72%, transparent); }
+.wheel::-webkit-scrollbar { display: none; }
+.wi { height: 40px; display: flex; align-items: center; justify-content: center; scroll-snap-align: center; font-family: var(--f-mono);
+  font-size: 1.05rem; color: var(--muted); cursor: pointer; font-variant-numeric: tabular-nums; white-space: nowrap; user-select: none; -webkit-user-select: none; }
+.wheel.txt .wi { font-family: var(--f-body); font-size: .95rem; }
+.wi.sel { color: var(--accent); font-weight: 600; font-size: 1.25rem; }
+.wheel.txt .wi.sel { font-size: 1.05rem; }
 .hint { margin: 0; font-size: .8rem; color: var(--muted); }
 .err { margin: 0; font-size: .85rem; color: var(--alert); min-height: 1.2em; }
 .row { display: flex; gap: 8px; }
@@ -176,6 +196,14 @@ textarea { resize: vertical; min-height: 72px; }
 
   <button class="btn primary add" id="addBtn" type="button">+ مهمة جديدة</button>
 
+  <div class="quick" id="quick" role="group" aria-label="بدء سريع بضغطة واحدة">
+    <button class="btn" type="button" data-q="300">5 د</button>
+    <button class="btn" type="button" data-q="900">15 د</button>
+    <button class="btn" type="button" data-q="1800">30 د</button>
+    <button class="btn" type="button" data-q="3600">ساعة</button>
+    <button class="btn" type="button" data-q="sw">ساعة إيقاف</button>
+  </div>
+
   <div class="tabs" id="tabs" role="group" aria-label="تصفية المهام">
     <button class="tab" type="button" data-f="all" aria-pressed="true">الكل</button>
     <button class="tab" type="button" data-f="date" aria-pressed="false">مواعيد</button>
@@ -188,17 +216,15 @@ textarea { resize: vertical; min-height: 72px; }
 
 <div class="overlay" id="overlay" hidden>
   <form class="sheet" id="form" dir="rtl" lang="ar" novalidate role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
-    <h2 id="sheetTitle">مهمة جديدة</h2>
+    <div class="sheet-head">
+      <h2 id="sheetTitle">مهمة جديدة</h2>
+      <button class="btn x" id="closeBtn" type="button" aria-label="إغلاق">×</button>
+    </div>
 
     <div class="field">
       <label for="fName">اسم المهمة</label>
       <input type="text" id="fName" maxlength="80" autocomplete="off" placeholder="مثلًا: فتح التطبيق">
     </div>
-    <div class="field">
-      <label for="fNote">ملاحظة</label>
-      <textarea id="fNote" maxlength="500" placeholder="اختياري"></textarea>
-    </div>
-
     <div class="field">
       <span class="lbl" id="modeLbl">طريقة حساب الوقت</span>
       <div class="seg" role="radiogroup" aria-labelledby="modeLbl">
@@ -206,21 +232,30 @@ textarea { resize: vertical; min-height: 72px; }
         <label><input type="radio" name="mode" value="countdown"><span>مؤقّت تنازلي</span></label>
         <label><input type="radio" name="mode" value="stopwatch"><span>ساعة إيقاف</span></label>
       </div>
-      <p class="hint">تغيير الطريقة يحافظ على الاسم والملاحظة. العدّاد نفسه يبدأ من جديد.</p>
     </div>
 
     <div class="field" id="secDate">
-      <label for="fDate">الموعد</label>
-      <input type="datetime-local" id="fDate">
+      <span class="lbl">اختار الموعد (حرّك العجلات)</span>
+      <div class="wheels">
+        <div class="wcol" style="flex: 2.3"><span class="wl">اليوم</span><div class="wwrap"><div class="wheel txt" id="wDay" role="listbox" aria-label="اليوم" tabindex="0"></div></div></div>
+        <div class="wcol"><span class="wl">الساعة</span><div class="wwrap"><div class="wheel" id="wHr" role="listbox" aria-label="الساعة" tabindex="0"></div></div></div>
+        <div class="wcol"><span class="wl">الدقيقة</span><div class="wwrap"><div class="wheel" id="wMin" role="listbox" aria-label="الدقيقة" tabindex="0"></div></div></div>
+        <div class="wcol"><span class="wl">ص / م</span><div class="wwrap"><div class="wheel txt" id="wAp" role="listbox" aria-label="صباحًا أو مساءً" tabindex="0"></div></div></div>
+      </div>
+      <div class="presets">
+        <button class="btn" type="button" data-d="h1">بعد ساعة</button>
+        <button class="btn" type="button" data-d="h3">بعد 3 ساعات</button>
+        <button class="btn" type="button" data-d="tm9">بكرة 9 ص</button>
+      </div>
     </div>
 
     <div id="secCount" hidden>
       <div class="field">
-        <span class="lbl">المدة</span>
-        <div class="dur">
-          <div class="field"><label for="fH">ساعات</label><input type="number" id="fH" min="0" max="999" inputmode="numeric"></div>
-          <div class="field"><label for="fM">دقائق</label><input type="number" id="fM" min="0" max="59" inputmode="numeric"></div>
-          <div class="field"><label for="fS">ثواني</label><input type="number" id="fS" min="0" max="59" inputmode="numeric"></div>
+        <span class="lbl">اختار المدة (حرّك العجلات)</span>
+        <div class="wheels">
+          <div class="wcol"><span class="wl">ساعات</span><div class="wwrap"><div class="wheel" id="wH" role="listbox" aria-label="ساعات" tabindex="0"></div></div></div>
+          <div class="wcol"><span class="wl">دقائق</span><div class="wwrap"><div class="wheel" id="wM" role="listbox" aria-label="دقائق" tabindex="0"></div></div></div>
+          <div class="wcol"><span class="wl">ثواني</span><div class="wwrap"><div class="wheel" id="wS" role="listbox" aria-label="ثواني" tabindex="0"></div></div></div>
         </div>
       </div>
       <div class="presets" style="margin-top:8px">
@@ -233,6 +268,12 @@ textarea { resize: vertical; min-height: 72px; }
     </div>
 
     <p class="hint" id="secStop" hidden>تبدأ ساعة الإيقاف من صفر وتعدّ للأعلى لحد ما توقفها.</p>
+    <p class="hint">تغيير الطريقة يحافظ على الاسم والملاحظة. العدّاد نفسه يبدأ من جديد.</p>
+
+    <div class="field">
+      <label for="fNote">ملاحظة</label>
+      <textarea id="fNote" maxlength="500" placeholder="اختياري"></textarea>
+    </div>
 
     <p class="err" id="err" role="alert"></p>
     <div class="row">
@@ -256,7 +297,7 @@ textarea { resize: vertical; min-height: 72px; }
   var filter = 'all';
   var editingId = null;
   var armedId = null, armedTimer = null, toastTimer = null;
-  var enterId = null, ringing = {}, ringTimer = null, ringCount = 0, lastSec = {};
+  var enterId = null, ringing = {}, ringTimer = null, ringCount = 0, lastSec = {}, sheetHist = false;
   var soundOn = true;
   try { soundOn = localStorage.getItem(KEY + '.sound') !== '0'; } catch (e) {}
 
@@ -534,19 +575,77 @@ textarea { resize: vertical; min-height: 72px; }
   }
 
   /* ---------- sheet ---------- */
-  function toLocalInput(ms) {
-    var d = new Date(ms);
-    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+  /* ---------- wheel pickers ---------- */
+  var ITEM = 40, DAYS = 60, W = {};
+  function range(a, b, f) { var r = []; for (var i = a; i <= b; i++) r.push(f ? f(i) : String(i)); return r; }
+  var dayFmt = new Intl.DateTimeFormat('ar-EG-u-nu-latn', { weekday: 'short', day: 'numeric', month: 'short' });
+  function dayLabels() {
+    var out = [], n = new Date();
+    for (var i = 0; i < DAYS; i++) {
+      out.push(i === 0 ? 'اليوم' : i === 1 ? 'بكرة' : dayFmt.format(new Date(n.getFullYear(), n.getMonth(), n.getDate() + i)));
+    }
+    return out;
+  }
+  function makeWheel(host, labels) {
+    var idx = 0;
+    labels.forEach(function (l, i) { host.appendChild(h('div', { class: 'wi', text: l, 'data-i': i })); });
+    function mark() { for (var j = 0; j < host.children.length; j++) host.children[j].classList.toggle('sel', j === idx); }
+    host.addEventListener('scroll', function () {
+      var i = Math.max(0, Math.min(labels.length - 1, Math.round(host.scrollTop / ITEM)));
+      if (i !== idx) { idx = i; mark(); fx('tick', 4); }
+    });
+    host.addEventListener('click', function (e) {
+      var t = e.target.closest('.wi');
+      if (t) host.scrollTo({ top: +t.getAttribute('data-i') * ITEM, behavior: 'smooth' });
+    });
+    mark();
+    return {
+      get: function () { return idx; },
+      set: function (i) { idx = Math.max(0, Math.min(labels.length - 1, i)); host.scrollTop = idx * ITEM; mark(); },
+      sync: function () { host.scrollTop = idx * ITEM; }
+    };
+  }
+  function freshDay() {
+    var old = $('wDay'), n = old.cloneNode(false);
+    old.parentNode.replaceChild(n, old);
+    W.day = makeWheel(n, dayLabels());
+  }
+  function buildWheels() {
+    freshDay();
+    W.hr = makeWheel($('wHr'), range(1, 12));
+    W.min = makeWheel($('wMin'), range(0, 59, pad));
+    W.ap = makeWheel($('wAp'), ['ص', 'م']);
+    W.h = makeWheel($('wH'), range(0, 99));
+    W.m = makeWheel($('wM'), range(0, 59));
+    W.s = makeWheel($('wS'), range(0, 59));
+  }
+  function syncWheels() { for (var k in W) W[k].sync(); }
+  function setDateWheels(ms) {
+    var d = new Date(ms), t0 = new Date();
+    var di = Math.round((new Date(d.getFullYear(), d.getMonth(), d.getDate()) - new Date(t0.getFullYear(), t0.getMonth(), t0.getDate())) / 86400000);
+    W.day.set(Math.max(0, Math.min(DAYS - 1, di)));
+    var h24 = d.getHours();
+    W.hr.set((h24 % 12 || 12) - 1);
+    W.min.set(d.getMinutes());
+    W.ap.set(h24 >= 12 ? 1 : 0);
+  }
+  function wheelsToDate() {
+    var n = new Date(), d = new Date(n.getFullYear(), n.getMonth(), n.getDate() + W.day.get());
+    d.setHours((W.hr.get() + 1) % 12 + (W.ap.get() ? 12 : 0), W.min.get(), 0, 0);
+    return d.getTime();
+  }
+  function setDur(sec) {
+    $('err').textContent = '';
+    W.h.set(Math.min(99, Math.floor(sec / 3600))); W.m.set(Math.floor((sec % 3600) / 60)); W.s.set(sec % 60);
   }
   function currentMode() { return document.querySelector('input[name="mode"]:checked').value; }
   function showMode() {
+    $('err').textContent = '';
     var m = currentMode();
     $('secDate').hidden = m !== 'date';
     $('secCount').hidden = m !== 'countdown';
     $('secStop').hidden = m !== 'stopwatch';
-  }
-  function setDur(sec) {
-    $('fH').value = Math.floor(sec / 3600); $('fM').value = Math.floor((sec % 3600) / 60); $('fS').value = sec % 60;
+    requestAnimationFrame(syncWheels);
   }
   function openSheet(id) {
     editingId = id;
@@ -557,14 +656,22 @@ textarea { resize: vertical; min-height: 72px; }
     var mode = t ? t.mode : 'countdown';
     document.querySelector('input[name="mode"][value="' + mode + '"]').checked = true;
     var target = t && t.target ? t.target : (function () { var d = new Date(); d.setHours(d.getHours() + 1, 0, 0, 0); return d.getTime(); })();
-    $('fDate').value = toLocalInput(target);
+    freshDay();
+    setDateWheels(target);
     setDur(Math.round((t ? t.duration : 1800000) / 1000));
     $('err').textContent = '';
     showMode();
     $('overlay').hidden = false;
-    $('fName').focus();
+    syncWheels();
+    requestAnimationFrame(syncWheels);
+    if (!sheetHist) { try { history.pushState({ sheet: 1 }, ''); sheetHist = true; } catch (e) {} }
+    if (!id) $('fName').focus();
   }
-  function closeSheet() { $('overlay').hidden = true; editingId = null; $('addBtn').focus(); }
+  function closeSheet() {
+    if ($('overlay').hidden) return;
+    $('overlay').hidden = true; editingId = null;
+    if (sheetHist) { sheetHist = false; try { history.back(); } catch (e) {} }
+  }
 
   function submit(e) {
     e.preventDefault();
@@ -574,13 +681,15 @@ textarea { resize: vertical; min-height: 72px; }
     if (!name) { $('err').textContent = 'اكتب اسم المهمة الأول.'; $('fName').focus(); return; }
     var target = null, duration = null;
     if (mode === 'date') {
-      target = new Date($('fDate').value).getTime();
-      if (!isFinite(target)) { $('err').textContent = 'اختار تاريخ ووقت صحيحين للموعد.'; $('fDate').focus(); return; }
+      target = wheelsToDate();
+      var cur = editingId ? find(editingId) : null;
+      if (target <= Date.now() && !(cur && cur.target && Math.abs(cur.target - target) < 60000)) {
+        $('err').textContent = 'الموعد ده عدّى. اختار وقت جاي.'; return;
+      }
     }
     if (mode === 'countdown') {
-      var hh = parseInt($('fH').value, 10) || 0, mm = parseInt($('fM').value, 10) || 0, ss = parseInt($('fS').value, 10) || 0;
-      duration = ((hh * 60 + mm) * 60 + ss) * 1000;
-      if (duration <= 0) { $('err').textContent = 'حدّد مدة أكبر من صفر.'; $('fM').focus(); return; }
+      duration = ((W.h.get() * 60 + W.m.get()) * 60 + W.s.get()) * 1000;
+      if (duration <= 0) { $('err').textContent = 'حدّد مدة أكبر من صفر.'; return; }
     }
     var t = editingId ? find(editingId) : null;
     var isNew = !t;
@@ -624,9 +733,33 @@ textarea { resize: vertical; min-height: 72px; }
   $('addBtn').addEventListener('click', function () { fx('tap'); openSheet(null); });
   $('cancelBtn').addEventListener('click', function () { fx('tap'); closeSheet(); });
   $('form').addEventListener('submit', submit);
-  $('overlay').addEventListener('mousedown', function (e) { if (e.target === $('overlay')) closeSheet(); });
+  $('overlay').addEventListener('click', function (e) { if (e.target === $('overlay')) closeSheet(); });
+  $('closeBtn').addEventListener('click', function () { fx('tap'); closeSheet(); });
+  $('form').addEventListener('input', function () { $('err').textContent = ''; });
+  window.addEventListener('popstate', function () {
+    if (!$('overlay').hidden) { sheetHist = false; closeSheet(); }
+  });
+  $('quick').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-q]'); if (!b) return;
+    var q = b.getAttribute('data-q');
+    var t = q === 'sw' ? mk({ name: 'ساعة إيقاف', mode: 'stopwatch' })
+      : mk({ name: 'مؤقّت ' + b.textContent, mode: 'countdown', duration: parseInt(q, 10) * 1000 });
+    start(t); tasks.push(t); enterId = t.id; filter = 'all';
+    document.querySelectorAll('.tab').forEach(function (x) { x.setAttribute('aria-pressed', String(x.getAttribute('data-f') === 'all')); });
+    save(); fx('start', 15); render(); tick();
+  });
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !$('overlay').hidden) closeSheet(); });
   document.querySelectorAll('input[name="mode"]').forEach(function (r) { r.addEventListener('change', function () { fx('tap', 8); showMode(); }); });
+  document.querySelectorAll('.presets [data-d]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      fx('tap', 8);
+      var k = b.getAttribute('data-d'), n = new Date(), ms;
+      if (k === 'h1') ms = Date.now() + 3600000;
+      else if (k === 'h3') ms = Date.now() + 3 * 3600000;
+      else ms = new Date(n.getFullYear(), n.getMonth(), n.getDate() + 1, 9, 0, 0, 0).getTime();
+      setDateWheels(ms); $('err').textContent = '';
+    });
+  });
   document.querySelectorAll('.presets [data-p]').forEach(function (b) {
     b.addEventListener('click', function () { fx('tap', 8); setDur(parseInt(b.getAttribute('data-p'), 10)); });
   });
@@ -653,7 +786,9 @@ textarea { resize: vertical; min-height: 72px; }
     }
   } catch (e) {}
 
+  buildWheels();
   if (!load()) seed();
+  $('overlay').hidden = true;
   render();
   tick();
   setInterval(tick, 250);
