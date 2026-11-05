@@ -174,6 +174,9 @@ textarea { resize: vertical; min-height: 72px; }
   .bar > i { transition: width .3s linear; }
   @keyframes rise { from { transform: translateY(24px); opacity: .6; } to { transform: none; opacity: 1; } }
 }
+select { width: 100%; min-width: 0; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; min-height: 44px; }
+.row select { flex: 2; }
+label.btn { display: flex; align-items: center; justify-content: center; text-align: center; cursor: pointer; }
 </style>
 </head>
 <body>
@@ -190,7 +193,7 @@ textarea { resize: vertical; min-height: 72px; }
   </header>
 
   <div class="notif" id="notif" hidden>
-    <span>فعّل التنبيهات علشان توصلك رسالة وقت ما يحين الموعد والتطبيق مفتوح.</span>
+    <span>فعّل التنبيهات علشان توصلك رسالة وقت الموعد حتى لو التطبيق في الخلفية.</span>
     <button class="btn" id="notifBtn" type="button">تفعيل</button>
   </div>
 
@@ -275,6 +278,17 @@ textarea { resize: vertical; min-height: 72px; }
       <textarea id="fNote" maxlength="500" placeholder="اختياري"></textarea>
     </div>
 
+    <div class="field">
+      <label for="fTone">نغمة التنبيه</label>
+      <div class="row"><select id="fTone"></select><button class="btn" type="button" id="toneTest">تجربة</button></div>
+      <div class="row"><label class="btn" for="fToneFile">إضافة نغمتي</label><input type="file" id="fToneFile" accept="audio/*" hidden><button class="btn danger" type="button" id="toneDel" hidden>حذف نغمتي</button></div>
+      <p class="hint" id="toneHint"></p>
+    </div>
+    <div class="field" id="secPre">
+      <label for="fPre">تنبيه مسبق</label>
+      <select id="fPre"><option value="0">بدون</option><option value="1">قبل دقيقة</option><option value="5">قبل 5 دقائق</option><option value="10">قبل 10 دقائق</option><option value="30">قبل 30 دقيقة</option><option value="60">قبل ساعة</option></select>
+    </div>
+
     <p class="err" id="err" role="alert"></p>
     <div class="row">
       <button class="btn primary" type="submit">حفظ</button>
@@ -297,7 +311,7 @@ textarea { resize: vertical; min-height: 72px; }
   var filter = 'all';
   var editingId = null;
   var armedId = null, armedTimer = null, toastTimer = null;
-  var enterId = null, ringing = {}, ringTimer = null, ringCount = 0, lastSec = {}, sheetHist = false;
+  var enterId = null, ringing = {}, ringTimer = null, ringCount = 0, ringTone = 'classic', lastSec = {}, sheetHist = false;
   var soundOn = true;
   try { soundOn = localStorage.getItem(KEY + '.sound') !== '0'; } catch (e) {}
 
@@ -338,6 +352,98 @@ textarea { resize: vertical; min-height: 72px; }
     try { if (vib && navigator.vibrate) navigator.vibrate(vib); } catch (e) {}
   }
 
+  /* ---------- tones: built-in + custom file (IndexedDB) ---------- */
+  var ALARM_NAMES = { classic: 'كلاسيك', bell: 'جرس', chime: 'رنين', digital: 'رقمي', soft: 'هادئ', rise: 'صاعد' };
+  var ALARMS = {
+    classic: function () { SFX.alarm(); },
+    bell: function () { tone(880, 0, 1.2, 'sine', .22); tone(1760, 0, .8, 'sine', .08); tone(1318, .5, 1, 'sine', .16); },
+    chime: function () { [523, 659, 784, 1047].forEach(function (f, i) { tone(f, i * .18, .5, 'triangle', .2); }); },
+    digital: function () { for (var i = 0; i < 4; i++) tone(1400, i * .15, .07, 'square', .1); },
+    soft: function () { tone(392, 0, .6, 'sine', .22); tone(523, .3, .9, 'sine', .22); },
+    rise: function () { [440, 554, 659, 880].forEach(function (f, i) { tone(f, i * .12, .2, 'sawtooth', .08); }); }
+  };
+  var customAudio = null, customName = '';
+  function idb(cb) {
+    try {
+      var r = indexedDB.open('mawaqitati-tones', 1);
+      r.onupgradeneeded = function () { r.result.createObjectStore('t'); };
+      r.onsuccess = function () { cb(r.result); };
+      r.onerror = function () { cb(null); };
+    } catch (e) { cb(null); }
+  }
+  function loadCustom(cb) {
+    idb(function (db) {
+      if (!db) { cb && cb(); return; }
+      try {
+        var q = db.transaction('t').objectStore('t').get('custom');
+        q.onsuccess = function () {
+          var v = q.result;
+          if (v && v.blob) { customName = v.name; customAudio = new Audio(URL.createObjectURL(v.blob)); customAudio.preload = 'auto'; }
+          cb && cb();
+        };
+        q.onerror = function () { cb && cb(); };
+      } catch (e) { cb && cb(); }
+    });
+  }
+  function saveCustom(file, cb) {
+    idb(function (db) {
+      if (!db) { cb(false); return; }
+      var tx = db.transaction('t', 'readwrite');
+      tx.objectStore('t').put({ name: file.name, blob: file }, 'custom');
+      tx.oncomplete = function () { loadCustom(function () { cb(true); }); };
+      tx.onerror = function () { cb(false); };
+    });
+  }
+  function removeCustom(cb) {
+    idb(function (db) {
+      if (!db) { cb(); return; }
+      var tx = db.transaction('t', 'readwrite');
+      tx.objectStore('t').delete('custom');
+      tx.oncomplete = function () { customAudio = null; customName = ''; cb(); };
+      tx.onerror = function () { cb(); };
+    });
+  }
+  function playAlarm(id) {
+    if (id === 'custom' && customAudio) { customAudio.loop = true; customAudio.currentTime = 0; customAudio.play().catch(function () {}); return; }
+    (ALARMS[id] || ALARMS.classic)();
+  }
+  function fillTones() {
+    var s = $('fTone'), cur = s.value; s.replaceChildren();
+    Object.keys(ALARM_NAMES).forEach(function (k) { s.appendChild(h('option', { value: k, text: ALARM_NAMES[k] })); });
+    if (customAudio) s.appendChild(h('option', { value: 'custom', text: 'نغمتي: ' + customName }));
+    s.value = cur && s.querySelector('option[value="' + cur + '"]') ? cur : 'classic';
+    $('toneDel').hidden = !customAudio;
+    $('toneHint').textContent = customAudio ? 'نغمتك محفوظة على الجهاز وتشتغل بدون نت.' : 'تقدر تضيف نغمة من جهازك (MP3 / WAV / M4A، لحد 5 ميجا).';
+  }
+
+  /* ---------- notifications (via service worker so they work on Android) ---------- */
+  function pushNote(title, body, tag) {
+    try {
+      if (!('Notification' in window) || Notification.permission !== 'granted') return;
+      var o = { body: body, tag: tag, icon: 'icon-192.png', badge: 'icon-192.png', vibrate: [200, 100, 200, 100, 200], requireInteraction: true, renotify: true, dir: 'rtl', lang: 'ar' };
+      if (navigator.serviceWorker && navigator.serviceWorker.ready) {
+        navigator.serviceWorker.ready.then(function (r) { r.showNotification(title, o); }).catch(function () { try { new Notification(title, o); } catch (e) {} });
+      } else { new Notification(title, o); }
+    } catch (e) {}
+  }
+  function syncSW() {
+    try {
+      if (!navigator.serviceWorker || !navigator.serviceWorker.controller) return;
+      var now = Date.now(), items = [];
+      tasks.forEach(function (t) {
+        var end = t.mode === 'date' ? t.target : (t.mode === 'countdown' && t.state === 'running' ? t.startedAt + t.duration - t.acc : 0);
+        if (!end || end <= now) return;
+        if (!t.notified) items.push({ at: end, tag: t.id, title: 'مؤقّتاتي', body: t.name + ' — ' + (t.mode === 'date' ? 'حان الموعد' : 'انتهى الوقت') });
+        if (t.pre && !t.preNotified && end - t.pre * 60000 > now) items.push({ at: end - t.pre * 60000, tag: t.id + '-pre', title: 'مؤقّتاتي', body: t.name + ' — باقي ' + t.pre + ' دقيقة' });
+      });
+      navigator.serviceWorker.controller.postMessage({ type: 'schedule', items: items });
+    } catch (e) {}
+  }
+  function notifyPre(t) {
+    var msg = t.name + ' — باقي ' + t.pre + ' دقيقة';
+    toast(msg); fx('renew', [100, 60, 100]); pushNote('مؤقّتاتي', msg, t.id + '-pre');
+  }
+
   /* ---------- alarm banner ---------- */
   function showRing() {
     var ids = Object.keys(ringing);
@@ -345,18 +451,18 @@ textarea { resize: vertical; min-height: 72px; }
     $('ringTxt').textContent = ids.length === 1 ? ringing[ids[0]] : ids.length + ' مهام حان وقتها';
     $('ring').hidden = false;
   }
-  function stopSound() { clearInterval(ringTimer); ringTimer = null; }
+  function stopSound() { clearInterval(ringTimer); ringTimer = null; if (customAudio) { try { customAudio.pause(); customAudio.currentTime = 0; } catch (e) {} } }
   function startRing(t, msg) {
     ringing[t.id] = msg;
     showRing();
     if (soundOn && !ringTimer) {
-      ringCount = 0;
-      SFX.alarm();
+      ringCount = 0; ringTone = t.tone || 'classic';
+      playAlarm(ringTone);
       try { if (navigator.vibrate) navigator.vibrate([200, 100, 200]); } catch (e) {}
       ringTimer = setInterval(function () {
         ringCount++;
         if (ringCount > 20 || !soundOn) { stopSound(); return; }
-        SFX.alarm();
+        if (ringTone !== 'custom') playAlarm(ringTone);
         try { if (navigator.vibrate) navigator.vibrate([200, 100, 200]); } catch (e) {}
       }, 1800);
     }
@@ -373,7 +479,7 @@ textarea { resize: vertical; min-height: 72px; }
   function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
   function mk(o) {
     return Object.assign({ id: uid(), name: '', note: '', mode: 'countdown', target: null, duration: 1800000,
-      state: 'idle', startedAt: 0, acc: 0, notified: false, created: Date.now() }, o);
+      state: 'idle', startedAt: 0, acc: 0, notified: false, tone: 'classic', pre: 0, preNotified: false, created: Date.now() }, o);
   }
 
   function load() {
@@ -383,7 +489,7 @@ textarea { resize: vertical; min-height: 72px; }
     } catch (e) {}
     return false;
   }
-  function save() { try { localStorage.setItem(KEY, JSON.stringify({ tasks: tasks })); } catch (e) {} }
+  function save() { try { localStorage.setItem(KEY, JSON.stringify({ tasks: tasks })); } catch (e) {} syncSW(); }
 
   function seed() {
     var d = new Date(); d.setDate(d.getDate() + 1); d.setHours(11, 0, 0, 0);
@@ -443,8 +549,8 @@ textarea { resize: vertical; min-height: 72px; }
   function find(id) { for (var i = 0; i < tasks.length; i++) if (tasks[i].id === id) return tasks[i]; return null; }
   function start(t) { t.state = 'running'; t.startedAt = Date.now(); }
   function pause(t) { t.acc += Date.now() - t.startedAt; t.state = 'paused'; }
-  function renew(t) { t.acc = 0; t.notified = false; start(t); }
-  function reset(t) { t.acc = 0; t.state = 'idle'; t.notified = false; }
+  function renew(t) { t.acc = 0; t.notified = false; t.preNotified = false; start(t); }
+  function reset(t) { t.acc = 0; t.state = 'idle'; t.notified = false; t.preNotified = false; }
 
   function act(id, what) {
     var t = find(id); if (!t) return;
@@ -544,7 +650,7 @@ textarea { resize: vertical; min-height: 72px; }
   function notify(t) {
     var msg = t.name + ' — ' + (t.mode === 'date' ? 'حان الموعد' : 'انتهى الوقت');
     startRing(t, msg);
-    try { if ('Notification' in window && Notification.permission === 'granted') new Notification('مؤقّتاتي', { body: msg }); } catch (e) {}
+    pushNote('مؤقّتاتي', msg, t.id);
   }
 
   function tick() {
@@ -557,6 +663,10 @@ textarea { resize: vertical; min-height: 72px; }
       if (t.mode === 'countdown' && t.state === 'running') {
         var left = Math.ceil((t.duration - elapsed(t, now)) / 1000);
         if (left >= 1 && left <= 3 && lastSec[t.id] !== left) { lastSec[t.id] = left; fx('tick'); }
+      }
+      if (t.pre && !t.preNotified && t.mode !== 'stopwatch') {
+        var rem2 = t.mode === 'date' ? t.target - now : (t.state === 'running' ? t.duration - elapsed(t, now) : -1);
+        if (rem2 > 0 && rem2 <= t.pre * 60000 && (t.mode === 'date' || t.duration > t.pre * 60000)) { t.preNotified = true; changed = true; notifyPre(t); }
       }
       var due = (t.mode === 'date' && now >= t.target) || (t.mode === 'countdown' && t.state === 'done');
       if (due && !t.notified) { t.notified = true; changed = true; notify(t); }
@@ -645,6 +755,7 @@ textarea { resize: vertical; min-height: 72px; }
     $('secDate').hidden = m !== 'date';
     $('secCount').hidden = m !== 'countdown';
     $('secStop').hidden = m !== 'stopwatch';
+    $('secPre').hidden = m === 'stopwatch';
     requestAnimationFrame(syncWheels);
   }
   function openSheet(id) {
@@ -659,6 +770,7 @@ textarea { resize: vertical; min-height: 72px; }
     freshDay();
     setDateWheels(target);
     setDur(Math.round((t ? t.duration : 1800000) / 1000));
+    fillTones(); $('fTone').value = t && t.tone && (t.tone !== 'custom' || customAudio) ? t.tone : 'classic'; $('fPre').value = String((t && t.pre) || 0);
     $('err').textContent = '';
     showMode();
     $('overlay').hidden = false;
@@ -694,13 +806,15 @@ textarea { resize: vertical; min-height: 72px; }
     var t = editingId ? find(editingId) : null;
     var isNew = !t;
     if (!t) { t = mk({}); tasks.push(t); }
-    var modeChanged = t.mode !== mode;
+    var oldPre = t.pre || 0, modeChanged = t.mode !== mode;
     var durChanged = mode === 'countdown' && t.duration !== duration;
     var targetChanged = mode === 'date' && t.target !== target;
     t.name = name; t.note = note; t.mode = mode;
+    t.tone = $('fTone').value; t.pre = parseInt($('fPre').value, 10) || 0;
+    if (oldPre !== t.pre) t.preNotified = false;
     if (mode === 'date') t.target = target;
     if (mode === 'countdown') t.duration = duration;
-    if (modeChanged || durChanged || targetChanged) { t.acc = 0; t.state = 'idle'; t.startedAt = 0; t.notified = false; }
+    if (modeChanged || durChanged || targetChanged) { t.acc = 0; t.state = 'idle'; t.startedAt = 0; t.notified = false; t.preNotified = false; }
     clearRing(t.id); enterId = isNew ? t.id : null; fx('save', 20);
     save(); closeSheet(); render(); tick();
   }
@@ -770,7 +884,7 @@ textarea { resize: vertical; min-height: 72px; }
     document.querySelectorAll('.tab').forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); });
     render();
   });
-  document.addEventListener('visibilitychange', function () { if (!document.hidden) tick(); });
+  document.addEventListener('visibilitychange', function () { if (document.hidden) syncSW(); else tick(); });
 
   try {
     if ('Notification' in window && Notification.permission === 'default') {
@@ -786,6 +900,26 @@ textarea { resize: vertical; min-height: 72px; }
     }
   } catch (e) {}
 
+  $('toneTest').addEventListener('click', function () {
+    audio(); stopSound();
+    var v = $('fTone').value;
+    if (v === 'custom' && customAudio) { customAudio.loop = false; customAudio.currentTime = 0; customAudio.play().catch(function () {}); }
+    else (ALARMS[v] || ALARMS.classic)();
+  });
+  $('fToneFile').addEventListener('change', function () {
+    var f = this.files[0]; this.value = '';
+    if (!f) return;
+    if (f.type && f.type.indexOf('audio') !== 0) { toast('اختار ملف صوتي.'); return; }
+    if (f.size > 5 * 1048576) { toast('الملف كبير. اختار نغمة أصغر من 5 ميجا.'); return; }
+    saveCustom(f, function (ok) {
+      fillTones();
+      if (ok) { $('fTone').value = 'custom'; toast('تمت إضافة نغمتك.'); } else toast('تعذّر حفظ النغمة على الجهاز.');
+    });
+  });
+  $('toneDel').addEventListener('click', function () { stopSound(); removeCustom(function () { fillTones(); toast('تم حذف نغمتك.'); }); });
+  loadCustom(fillTones);
+  try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) {}
+  try { navigator.serviceWorker.ready.then(syncSW); } catch (e) {}
   buildWheels();
   if (!load()) seed();
   $('overlay').hidden = true;
