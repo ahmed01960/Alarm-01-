@@ -83,6 +83,18 @@ h1 { margin: 0; font-family: var(--f-display); font-weight: 700; font-size: 2.1r
 .tab { border: 1px solid var(--line); background: transparent; border-radius: 999px; padding: 4px 14px; font-size: .85rem; color: var(--muted); }
 .tab[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
 
+.ltab { border: 1px solid var(--line); background: transparent; border-radius: 10px; padding: 4px 14px; font-size: .85rem; color: var(--muted); min-height: 34px; transition: background-color .15s, transform .08s; }
+.ltab:active { transform: scale(.94); }
+.ltab[aria-pressed="true"] { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); font-weight: 600; }
+.ltab.new { border-style: dashed; color: var(--accent); }
+.listbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; background: var(--accent-soft); border-radius: 12px; padding: 6px 14px 6px 6px; }
+.listbar b { font-family: var(--f-display); font-size: 1.05rem; overflow-wrap: anywhere; }
+.checks { display: flex; flex-direction: column; gap: 2px; max-height: 220px; overflow-y: auto; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 4px; }
+.checks label { display: flex; align-items: center; gap: 10px; padding: 8px; border-radius: 8px; cursor: pointer; font-size: .92rem; min-height: 44px; }
+.checks label:hover { background: var(--surface-2); }
+.checks input { width: 20px; height: 20px; accent-color: var(--accent); flex-shrink: 0; }
+.checks small { color: var(--muted); margin-inline-start: auto; }
+select { width: 100%; min-width: 0; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; min-height: 44px; font: inherit; color: inherit; }
 .list { display: flex; flex-direction: column; gap: 12px; }
 .card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
 .card.due { border-color: var(--alert); background: linear-gradient(var(--alert-soft), var(--alert-soft)) , var(--surface); background-blend-mode: normal; }
@@ -174,9 +186,6 @@ textarea { resize: vertical; min-height: 72px; }
   .bar > i { transition: width .3s linear; }
   @keyframes rise { from { transform: translateY(24px); opacity: .6; } to { transform: none; opacity: 1; } }
 }
-select { width: 100%; min-width: 0; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; min-height: 44px; }
-.row select { flex: 2; }
-label.btn { display: flex; align-items: center; justify-content: center; text-align: center; cursor: pointer; }
 </style>
 </head>
 <body>
@@ -193,7 +202,7 @@ label.btn { display: flex; align-items: center; justify-content: center; text-al
   </header>
 
   <div class="notif" id="notif" hidden>
-    <span>فعّل التنبيهات علشان توصلك رسالة وقت الموعد حتى لو التطبيق في الخلفية.</span>
+    <span>فعّل التنبيهات علشان توصلك رسالة وقت ما يحين الموعد والتطبيق مفتوح.</span>
     <button class="btn" id="notifBtn" type="button">تفعيل</button>
   </div>
 
@@ -212,6 +221,12 @@ label.btn { display: flex; align-items: center; justify-content: center; text-al
     <button class="tab" type="button" data-f="date" aria-pressed="false">مواعيد</button>
     <button class="tab" type="button" data-f="countdown" aria-pressed="false">مؤقّتات</button>
     <button class="tab" type="button" data-f="stopwatch" aria-pressed="false">ساعات إيقاف</button>
+  </div>
+
+  <div class="tabs" id="lists" role="group" aria-label="القوائم"></div>
+  <div class="listbar" id="listbar" hidden>
+    <b id="listbarName"></b>
+    <button class="btn" id="listEdit" type="button">تعديل القائمة</button>
   </div>
 
   <main class="list" id="list"></main>
@@ -273,26 +288,41 @@ label.btn { display: flex; align-items: center; justify-content: center; text-al
     <p class="hint" id="secStop" hidden>تبدأ ساعة الإيقاف من صفر وتعدّ للأعلى لحد ما توقفها.</p>
     <p class="hint">تغيير الطريقة يحافظ على الاسم والملاحظة. العدّاد نفسه يبدأ من جديد.</p>
 
+    <div class="field" id="fListWrap" hidden>
+      <label for="fList">القائمة</label>
+      <select id="fList"></select>
+    </div>
     <div class="field">
       <label for="fNote">ملاحظة</label>
       <textarea id="fNote" maxlength="500" placeholder="اختياري"></textarea>
-    </div>
-
-    <div class="field">
-      <label for="fTone">نغمة التنبيه</label>
-      <div class="row"><select id="fTone"></select><button class="btn" type="button" id="toneTest">تجربة</button></div>
-      <div class="row"><label class="btn" for="fToneFile">إضافة نغمتي</label><input type="file" id="fToneFile" accept="audio/*" hidden><button class="btn danger" type="button" id="toneDel" hidden>حذف نغمتي</button></div>
-      <p class="hint" id="toneHint"></p>
-    </div>
-    <div class="field" id="secPre">
-      <label for="fPre">تنبيه مسبق</label>
-      <select id="fPre"><option value="0">بدون</option><option value="1">قبل دقيقة</option><option value="5">قبل 5 دقائق</option><option value="10">قبل 10 دقائق</option><option value="30">قبل 30 دقيقة</option><option value="60">قبل ساعة</option></select>
     </div>
 
     <p class="err" id="err" role="alert"></p>
     <div class="row">
       <button class="btn primary" type="submit">حفظ</button>
       <button class="btn" type="button" id="cancelBtn">إلغاء</button>
+    </div>
+  </form>
+</div>
+
+<div class="overlay" id="lovl" hidden>
+  <form class="sheet" id="lform" dir="rtl" lang="ar" novalidate role="dialog" aria-modal="true" aria-labelledby="lTitle">
+    <div class="sheet-head">
+      <h2 id="lTitle">قائمة جديدة</h2>
+      <button class="btn x" id="lClose" type="button" aria-label="إغلاق">×</button>
+    </div>
+    <div class="field">
+      <label for="lName">اسم القائمة</label>
+      <input type="text" id="lName" maxlength="40" autocomplete="off" placeholder="مثلًا: الصباح، المذاكرة، الشغل">
+    </div>
+    <div class="field" id="lPickWrap">
+      <span class="lbl">ضيف مهامك في القائمة</span>
+      <div class="checks" id="lPick"></div>
+    </div>
+    <p class="err" id="lErr" role="alert"></p>
+    <div class="row">
+      <button class="btn primary" type="submit">حفظ</button>
+      <button class="btn danger" type="button" id="lDel" hidden>حذف القائمة</button>
     </div>
   </form>
 </div>
@@ -308,10 +338,12 @@ label.btn { display: flex; align-items: center; justify-content: center; text-al
   var KEY = 'mawaqitati.v1';
   var MODES = { date: 'موعد', countdown: 'مؤقّت', stopwatch: 'ساعة إيقاف' };
   var tasks = [];
+  var lists = [];
+  var listFilter = 'all', editingList = null, lArmed = false, lArmedTimer = null;
   var filter = 'all';
   var editingId = null;
   var armedId = null, armedTimer = null, toastTimer = null;
-  var enterId = null, ringing = {}, ringTimer = null, ringCount = 0, ringTone = 'classic', lastSec = {}, sheetHist = false;
+  var enterId = null, ringing = {}, ringTimer = null, ringCount = 0, lastSec = {}, sheetHist = false;
   var soundOn = true;
   try { soundOn = localStorage.getItem(KEY + '.sound') !== '0'; } catch (e) {}
 
@@ -352,98 +384,6 @@ label.btn { display: flex; align-items: center; justify-content: center; text-al
     try { if (vib && navigator.vibrate) navigator.vibrate(vib); } catch (e) {}
   }
 
-  /* ---------- tones: built-in + custom file (IndexedDB) ---------- */
-  var ALARM_NAMES = { classic: 'كلاسيك', bell: 'جرس', chime: 'رنين', digital: 'رقمي', soft: 'هادئ', rise: 'صاعد' };
-  var ALARMS = {
-    classic: function () { SFX.alarm(); },
-    bell: function () { tone(880, 0, 1.2, 'sine', .22); tone(1760, 0, .8, 'sine', .08); tone(1318, .5, 1, 'sine', .16); },
-    chime: function () { [523, 659, 784, 1047].forEach(function (f, i) { tone(f, i * .18, .5, 'triangle', .2); }); },
-    digital: function () { for (var i = 0; i < 4; i++) tone(1400, i * .15, .07, 'square', .1); },
-    soft: function () { tone(392, 0, .6, 'sine', .22); tone(523, .3, .9, 'sine', .22); },
-    rise: function () { [440, 554, 659, 880].forEach(function (f, i) { tone(f, i * .12, .2, 'sawtooth', .08); }); }
-  };
-  var customAudio = null, customName = '';
-  function idb(cb) {
-    try {
-      var r = indexedDB.open('mawaqitati-tones', 1);
-      r.onupgradeneeded = function () { r.result.createObjectStore('t'); };
-      r.onsuccess = function () { cb(r.result); };
-      r.onerror = function () { cb(null); };
-    } catch (e) { cb(null); }
-  }
-  function loadCustom(cb) {
-    idb(function (db) {
-      if (!db) { cb && cb(); return; }
-      try {
-        var q = db.transaction('t').objectStore('t').get('custom');
-        q.onsuccess = function () {
-          var v = q.result;
-          if (v && v.blob) { customName = v.name; customAudio = new Audio(URL.createObjectURL(v.blob)); customAudio.preload = 'auto'; }
-          cb && cb();
-        };
-        q.onerror = function () { cb && cb(); };
-      } catch (e) { cb && cb(); }
-    });
-  }
-  function saveCustom(file, cb) {
-    idb(function (db) {
-      if (!db) { cb(false); return; }
-      var tx = db.transaction('t', 'readwrite');
-      tx.objectStore('t').put({ name: file.name, blob: file }, 'custom');
-      tx.oncomplete = function () { loadCustom(function () { cb(true); }); };
-      tx.onerror = function () { cb(false); };
-    });
-  }
-  function removeCustom(cb) {
-    idb(function (db) {
-      if (!db) { cb(); return; }
-      var tx = db.transaction('t', 'readwrite');
-      tx.objectStore('t').delete('custom');
-      tx.oncomplete = function () { customAudio = null; customName = ''; cb(); };
-      tx.onerror = function () { cb(); };
-    });
-  }
-  function playAlarm(id) {
-    if (id === 'custom' && customAudio) { customAudio.loop = true; customAudio.currentTime = 0; customAudio.play().catch(function () {}); return; }
-    (ALARMS[id] || ALARMS.classic)();
-  }
-  function fillTones() {
-    var s = $('fTone'), cur = s.value; s.replaceChildren();
-    Object.keys(ALARM_NAMES).forEach(function (k) { s.appendChild(h('option', { value: k, text: ALARM_NAMES[k] })); });
-    if (customAudio) s.appendChild(h('option', { value: 'custom', text: 'نغمتي: ' + customName }));
-    s.value = cur && s.querySelector('option[value="' + cur + '"]') ? cur : 'classic';
-    $('toneDel').hidden = !customAudio;
-    $('toneHint').textContent = customAudio ? 'نغمتك محفوظة على الجهاز وتشتغل بدون نت.' : 'تقدر تضيف نغمة من جهازك (MP3 / WAV / M4A، لحد 5 ميجا).';
-  }
-
-  /* ---------- notifications (via service worker so they work on Android) ---------- */
-  function pushNote(title, body, tag) {
-    try {
-      if (!('Notification' in window) || Notification.permission !== 'granted') return;
-      var o = { body: body, tag: tag, icon: 'icon-192.png', badge: 'icon-192.png', vibrate: [200, 100, 200, 100, 200], requireInteraction: true, renotify: true, dir: 'rtl', lang: 'ar' };
-      if (navigator.serviceWorker && navigator.serviceWorker.ready) {
-        navigator.serviceWorker.ready.then(function (r) { r.showNotification(title, o); }).catch(function () { try { new Notification(title, o); } catch (e) {} });
-      } else { new Notification(title, o); }
-    } catch (e) {}
-  }
-  function syncSW() {
-    try {
-      if (!navigator.serviceWorker || !navigator.serviceWorker.controller) return;
-      var now = Date.now(), items = [];
-      tasks.forEach(function (t) {
-        var end = t.mode === 'date' ? t.target : (t.mode === 'countdown' && t.state === 'running' ? t.startedAt + t.duration - t.acc : 0);
-        if (!end || end <= now) return;
-        if (!t.notified) items.push({ at: end, tag: t.id, title: 'مؤقّتاتي', body: t.name + ' — ' + (t.mode === 'date' ? 'حان الموعد' : 'انتهى الوقت') });
-        if (t.pre && !t.preNotified && end - t.pre * 60000 > now) items.push({ at: end - t.pre * 60000, tag: t.id + '-pre', title: 'مؤقّتاتي', body: t.name + ' — باقي ' + t.pre + ' دقيقة' });
-      });
-      navigator.serviceWorker.controller.postMessage({ type: 'schedule', items: items });
-    } catch (e) {}
-  }
-  function notifyPre(t) {
-    var msg = t.name + ' — باقي ' + t.pre + ' دقيقة';
-    toast(msg); fx('renew', [100, 60, 100]); pushNote('مؤقّتاتي', msg, t.id + '-pre');
-  }
-
   /* ---------- alarm banner ---------- */
   function showRing() {
     var ids = Object.keys(ringing);
@@ -451,18 +391,18 @@ label.btn { display: flex; align-items: center; justify-content: center; text-al
     $('ringTxt').textContent = ids.length === 1 ? ringing[ids[0]] : ids.length + ' مهام حان وقتها';
     $('ring').hidden = false;
   }
-  function stopSound() { clearInterval(ringTimer); ringTimer = null; if (customAudio) { try { customAudio.pause(); customAudio.currentTime = 0; } catch (e) {} } }
+  function stopSound() { clearInterval(ringTimer); ringTimer = null; }
   function startRing(t, msg) {
     ringing[t.id] = msg;
     showRing();
     if (soundOn && !ringTimer) {
-      ringCount = 0; ringTone = t.tone || 'classic';
-      playAlarm(ringTone);
+      ringCount = 0;
+      SFX.alarm();
       try { if (navigator.vibrate) navigator.vibrate([200, 100, 200]); } catch (e) {}
       ringTimer = setInterval(function () {
         ringCount++;
         if (ringCount > 20 || !soundOn) { stopSound(); return; }
-        if (ringTone !== 'custom') playAlarm(ringTone);
+        SFX.alarm();
         try { if (navigator.vibrate) navigator.vibrate([200, 100, 200]); } catch (e) {}
       }, 1800);
     }
@@ -479,17 +419,22 @@ label.btn { display: flex; align-items: center; justify-content: center; text-al
   function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
   function mk(o) {
     return Object.assign({ id: uid(), name: '', note: '', mode: 'countdown', target: null, duration: 1800000,
-      state: 'idle', startedAt: 0, acc: 0, notified: false, tone: 'classic', pre: 0, preNotified: false, created: Date.now() }, o);
+      state: 'idle', startedAt: 0, acc: 0, notified: false, created: Date.now() }, o);
   }
 
   function load() {
     try {
       var raw = localStorage.getItem(KEY);
-      if (raw) { var d = JSON.parse(raw); if (d && Array.isArray(d.tasks)) { tasks = d.tasks; return true; } }
+      if (raw) { var d = JSON.parse(raw); if (d && Array.isArray(d.tasks)) {
+        tasks = d.tasks;
+        lists = Array.isArray(d.lists) ? d.lists : [];
+        tasks.forEach(function (t) { if (t.list && !findList(t.list)) t.list = null; });
+        return true;
+      } }
     } catch (e) {}
     return false;
   }
-  function save() { try { localStorage.setItem(KEY, JSON.stringify({ tasks: tasks })); } catch (e) {} syncSW(); }
+  function save() { try { localStorage.setItem(KEY, JSON.stringify({ tasks: tasks, lists: lists })); } catch (e) {} }
 
   function seed() {
     var d = new Date(); d.setDate(d.getDate() + 1); d.setHours(11, 0, 0, 0);
@@ -546,11 +491,13 @@ label.btn { display: flex; align-items: center; justify-content: center; text-al
   }
 
   /* ---------- actions ---------- */
+  function findList(id) { for (var i = 0; i < lists.length; i++) if (lists[i].id === id) return lists[i]; return null; }
+  function curList() { return findList(listFilter) ? listFilter : null; }
   function find(id) { for (var i = 0; i < tasks.length; i++) if (tasks[i].id === id) return tasks[i]; return null; }
   function start(t) { t.state = 'running'; t.startedAt = Date.now(); }
   function pause(t) { t.acc += Date.now() - t.startedAt; t.state = 'paused'; }
-  function renew(t) { t.acc = 0; t.notified = false; t.preNotified = false; start(t); }
-  function reset(t) { t.acc = 0; t.state = 'idle'; t.notified = false; t.preNotified = false; }
+  function renew(t) { t.acc = 0; t.notified = false; start(t); }
+  function reset(t) { t.acc = 0; t.state = 'idle'; t.notified = false; }
 
   function act(id, what) {
     var t = find(id); if (!t) return;
@@ -558,6 +505,7 @@ label.btn { display: flex; align-items: center; justify-content: center; text-al
     else if (what === 'pause') { pause(t); fx('pause', 15); }
     else if (what === 'renew') { renew(t); clearRing(id); delete lastSec[id]; fx('renew', 20); }
     else if (what === 'reset') { reset(t); fx('reset', 15); }
+    else if (what === 'dup') { fx('tap'); openSheet(null, id); return; }
     else if (what === 'edit') { fx('tap'); openSheet(id); return; }
     else if (what === 'delete') {
       if (armedId !== id) {
@@ -592,7 +540,7 @@ label.btn { display: flex; align-items: center; justify-content: center; text-al
     var v = view(t, now);
     var el = h('article', { class: 'card' + (v.due ? ' due' : '') + (ringing[t.id] ? ' ringing' : '') + (t.id === enterId ? ' enter' : ''), 'data-id': t.id });
     el.appendChild(h('div', { class: 'meta' }, [
-      h('span', { class: 'chip', text: MODES[t.mode] }),
+      h('span', { class: 'chip', text: MODES[t.mode] + (t.list && listFilter === 'all' && findList(t.list) ? ' · ' + findList(t.list).name : '') }),
       h('span', { class: 'status ' + v.cls, 'data-k': 'status', text: v.status })
     ]));
     el.appendChild(h('h3', { text: t.name }));
@@ -624,6 +572,7 @@ label.btn { display: flex; align-items: center; justify-content: center; text-al
       if (t.state === 'paused') a.appendChild(btn('استكمال', 'resume', t.id, 'primary'));
       if (t.state !== 'idle') a.appendChild(btn('تصفير', 'reset', t.id));
     }
+    a.appendChild(btn('نسخ', 'dup', t.id));
     a.appendChild(btn(t.mode === 'date' ? 'تعديل الموعد' : 'تعديل', 'edit', t.id));
     a.appendChild(btn(armedId === t.id ? 'تأكيد الحذف' : 'حذف', 'delete', t.id, 'danger' + (armedId === t.id ? ' armed' : '')));
     el.appendChild(a);
@@ -634,10 +583,12 @@ label.btn { display: flex; align-items: center; justify-content: center; text-al
     var now = Date.now();
     var list = $('list');
     var shown = tasks.slice().sort(function (a, b) { return b.created - a.created; })
-      .filter(function (t) { return filter === 'all' || t.mode === filter; });
+      .filter(function (t) { return filter === 'all' || t.mode === filter; })
+      .filter(function (t) { return listFilter === 'all' || (listFilter === 'none' ? !t.list : t.list === listFilter); });
     list.replaceChildren();
+    renderLists();
     if (!shown.length) {
-      list.appendChild(h('div', { class: 'empty', text: tasks.length ? 'مفيش مهام في التصنيف ده.' : 'لسه مفيش مهام. اضغط «مهمة جديدة» وابدأ.' }));
+      list.appendChild(h('div', { class: 'empty', text: findList(listFilter) && !tasks.some(function (t) { return t.list === listFilter; }) ? 'القائمة فاضية. اضغط «تعديل القائمة» وضيف مهامك فيها.' : tasks.length ? 'مفيش مهام في التصنيف ده.' : 'لسه مفيش مهام. اضغط «مهمة جديدة» وابدأ.' }));
     } else {
       shown.forEach(function (t) { list.appendChild(card(t, now)); });
     }
@@ -646,11 +597,80 @@ label.btn { display: flex; align-items: center; justify-content: center; text-al
     $('summary').textContent = tasks.length + ' مهام · ' + running + ' جارية';
   }
 
+  function renderLists() {
+    if (listFilter !== 'all' && listFilter !== 'none' && !findList(listFilter)) listFilter = 'all';
+    var host = $('lists'); host.replaceChildren();
+    function chip(label, key, cls) {
+      host.appendChild(h('button', { type: 'button', class: 'ltab' + (cls ? ' ' + cls : ''), text: label, 'data-l': key, 'aria-pressed': String(listFilter === key) }));
+    }
+    var none = tasks.filter(function (t) { return !t.list; }).length;
+    if (lists.length) {
+      chip('كل القوائم', 'all');
+      lists.forEach(function (l) {
+        chip(l.name + ' (' + tasks.filter(function (t) { return t.list === l.id; }).length + ')', l.id);
+      });
+      if (none && none < tasks.length) chip('بدون قائمة (' + none + ')', 'none');
+    }
+    chip('+ قائمة', 'new', 'new');
+    var cur = findList(listFilter);
+    $('listbar').hidden = !cur;
+    if (cur) $('listbarName').textContent = cur.name;
+  }
+
+  /* ---------- list sheet ---------- */
+  function openListSheet(id) {
+    editingList = id; lArmed = false;
+    var l = id ? findList(id) : null;
+    $('lTitle').textContent = l ? 'تعديل القائمة' : 'قائمة جديدة';
+    $('lName').value = l ? l.name : '';
+    $('lErr').textContent = '';
+    $('lDel').hidden = !l;
+    $('lDel').textContent = 'حذف القائمة';
+    var box = $('lPick'); box.replaceChildren();
+    tasks.slice().sort(function (a, b) { return b.created - a.created; }).forEach(function (t) {
+      var cb = h('input', { type: 'checkbox', value: t.id });
+      if (l && t.list === l.id) cb.checked = true;
+      box.appendChild(h('label', {}, [cb, h('span', { text: t.name }), h('small', { text: MODES[t.mode] })]));
+    });
+    $('lPickWrap').hidden = !tasks.length;
+    $('lovl').hidden = false;
+    if (!l) $('lName').focus();
+  }
+  function closeListSheet() { $('lovl').hidden = true; editingList = null; }
+  function submitList(e) {
+    e.preventDefault();
+    var name = $('lName').value.trim();
+    if (!name) { $('lErr').textContent = 'اكتب اسم القائمة الأول.'; $('lName').focus(); return; }
+    var l = editingList ? findList(editingList) : null;
+    if (!l) { l = { id: uid(), name: name, created: Date.now() }; lists.push(l); }
+    l.name = name;
+    var boxes = $('lPick').querySelectorAll('input');
+    for (var i = 0; i < boxes.length; i++) {
+      var t = find(boxes[i].value); if (!t) continue;
+      if (boxes[i].checked) t.list = l.id; else if (t.list === l.id) t.list = null;
+    }
+    listFilter = l.id;
+    fx('save', 20); save(); closeListSheet(); render();
+  }
+  function deleteList() {
+    if (!editingList) return;
+    if (!lArmed) {
+      lArmed = true; $('lDel').textContent = 'تأكيد الحذف (المهام هتفضل)'; fx('tap', 10);
+      clearTimeout(lArmedTimer); lArmedTimer = setTimeout(function () { lArmed = false; $('lDel').textContent = 'حذف القائمة'; }, 3000);
+      return;
+    }
+    var id = editingList;
+    tasks.forEach(function (t) { if (t.list === id) t.list = null; });
+    lists = lists.filter(function (l) { return l.id !== id; });
+    if (listFilter === id) listFilter = 'all';
+    fx('del', 30); save(); closeListSheet(); render();
+  }
+
   /* ---------- tick ---------- */
   function notify(t) {
     var msg = t.name + ' — ' + (t.mode === 'date' ? 'حان الموعد' : 'انتهى الوقت');
     startRing(t, msg);
-    pushNote('مؤقّتاتي', msg, t.id);
+    try { if ('Notification' in window && Notification.permission === 'granted') new Notification('مؤقّتاتي', { body: msg }); } catch (e) {}
   }
 
   function tick() {
@@ -663,10 +683,6 @@ label.btn { display: flex; align-items: center; justify-content: center; text-al
       if (t.mode === 'countdown' && t.state === 'running') {
         var left = Math.ceil((t.duration - elapsed(t, now)) / 1000);
         if (left >= 1 && left <= 3 && lastSec[t.id] !== left) { lastSec[t.id] = left; fx('tick'); }
-      }
-      if (t.pre && !t.preNotified && t.mode !== 'stopwatch') {
-        var rem2 = t.mode === 'date' ? t.target - now : (t.state === 'running' ? t.duration - elapsed(t, now) : -1);
-        if (rem2 > 0 && rem2 <= t.pre * 60000 && (t.mode === 'date' || t.duration > t.pre * 60000)) { t.preNotified = true; changed = true; notifyPre(t); }
       }
       var due = (t.mode === 'date' && now >= t.target) || (t.mode === 'countdown' && t.state === 'done');
       if (due && !t.notified) { t.notified = true; changed = true; notify(t); }
@@ -755,22 +771,27 @@ label.btn { display: flex; align-items: center; justify-content: center; text-al
     $('secDate').hidden = m !== 'date';
     $('secCount').hidden = m !== 'countdown';
     $('secStop').hidden = m !== 'stopwatch';
-    $('secPre').hidden = m === 'stopwatch';
     requestAnimationFrame(syncWheels);
   }
-  function openSheet(id) {
+  function openSheet(id, dup) {
     editingId = id;
     var t = id ? find(id) : null;
-    $('sheetTitle').textContent = t ? 'تعديل المهمة' : 'مهمة جديدة';
-    $('fName').value = t ? t.name : '';
-    $('fNote').value = t ? t.note : '';
-    var mode = t ? t.mode : 'countdown';
+    var src = t || (dup ? find(dup) : null);
+    $('sheetTitle').textContent = t ? 'تعديل المهمة' : src ? 'نسخ المهمة' : 'مهمة جديدة';
+    $('fName').value = src ? src.name + (t ? '' : ' (نسخة)') : '';
+    $('fNote').value = src ? src.note : '';
+    var mode = src ? src.mode : 'countdown';
     document.querySelector('input[name="mode"][value="' + mode + '"]').checked = true;
-    var target = t && t.target ? t.target : (function () { var d = new Date(); d.setHours(d.getHours() + 1, 0, 0, 0); return d.getTime(); })();
+    var target = src && src.target ? src.target : (function () { var d = new Date(); d.setHours(d.getHours() + 1, 0, 0, 0); return d.getTime(); })();
     freshDay();
     setDateWheels(target);
-    setDur(Math.round((t ? t.duration : 1800000) / 1000));
-    fillTones(); $('fTone').value = t && t.tone && (t.tone !== 'custom' || customAudio) ? t.tone : 'classic'; $('fPre').value = String((t && t.pre) || 0);
+    if (!t && src && src.mode === 'date') { while (target <= Date.now()) target += 86400000; setDateWheels(target); }
+    setDur(Math.round((src ? src.duration : 1800000) / 1000));
+    var sel = $('fList'); sel.replaceChildren();
+    sel.appendChild(h('option', { value: '', text: 'بدون قائمة' }));
+    lists.forEach(function (l) { sel.appendChild(h('option', { value: l.id, text: l.name })); });
+    sel.value = src ? (src.list || '') : (curList() || '');
+    $('fListWrap').hidden = !lists.length;
     $('err').textContent = '';
     showMode();
     $('overlay').hidden = false;
@@ -806,15 +827,13 @@ label.btn { display: flex; align-items: center; justify-content: center; text-al
     var t = editingId ? find(editingId) : null;
     var isNew = !t;
     if (!t) { t = mk({}); tasks.push(t); }
-    var oldPre = t.pre || 0, modeChanged = t.mode !== mode;
+    var modeChanged = t.mode !== mode;
     var durChanged = mode === 'countdown' && t.duration !== duration;
     var targetChanged = mode === 'date' && t.target !== target;
-    t.name = name; t.note = note; t.mode = mode;
-    t.tone = $('fTone').value; t.pre = parseInt($('fPre').value, 10) || 0;
-    if (oldPre !== t.pre) t.preNotified = false;
+    t.name = name; t.note = note; t.mode = mode; t.list = $('fList').value || null;
     if (mode === 'date') t.target = target;
     if (mode === 'countdown') t.duration = duration;
-    if (modeChanged || durChanged || targetChanged) { t.acc = 0; t.state = 'idle'; t.startedAt = 0; t.notified = false; t.preNotified = false; }
+    if (modeChanged || durChanged || targetChanged) { t.acc = 0; t.state = 'idle'; t.startedAt = 0; t.notified = false; }
     clearRing(t.id); enterId = isNew ? t.id : null; fx('save', 20);
     save(); closeSheet(); render(); tick();
   }
@@ -843,6 +862,18 @@ label.btn { display: flex; align-items: center; justify-content: center; text-al
     fx('tap', 10);
   });
   $('ringStop').addEventListener('click', dismissRing);
+  $('lists').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-l]'); if (!b) return;
+    var k = b.getAttribute('data-l'); fx('tap', 8);
+    if (k === 'new') { openListSheet(null); return; }
+    listFilter = k; render();
+  });
+  $('listEdit').addEventListener('click', function () { fx('tap'); openListSheet(listFilter); });
+  $('lform').addEventListener('submit', submitList);
+  $('lClose').addEventListener('click', function () { fx('tap'); closeListSheet(); });
+  $('lDel').addEventListener('click', deleteList);
+  $('lform').addEventListener('input', function () { $('lErr').textContent = ''; });
+  $('lovl').addEventListener('click', function (e) { if (e.target === $('lovl')) closeListSheet(); });
   document.addEventListener('pointerdown', function () { if (soundOn) audio(); }, { once: true });
   $('addBtn').addEventListener('click', function () { fx('tap'); openSheet(null); });
   $('cancelBtn').addEventListener('click', function () { fx('tap'); closeSheet(); });
@@ -856,13 +887,16 @@ label.btn { display: flex; align-items: center; justify-content: center; text-al
   $('quick').addEventListener('click', function (e) {
     var b = e.target.closest('button[data-q]'); if (!b) return;
     var q = b.getAttribute('data-q');
-    var t = q === 'sw' ? mk({ name: 'ساعة إيقاف', mode: 'stopwatch' })
-      : mk({ name: 'مؤقّت ' + b.textContent, mode: 'countdown', duration: parseInt(q, 10) * 1000 });
+    var t = q === 'sw' ? mk({ name: 'ساعة إيقاف', mode: 'stopwatch', list: curList() })
+      : mk({ name: 'مؤقّت ' + b.textContent, mode: 'countdown', duration: parseInt(q, 10) * 1000, list: curList() });
     start(t); tasks.push(t); enterId = t.id; filter = 'all';
     document.querySelectorAll('.tab').forEach(function (x) { x.setAttribute('aria-pressed', String(x.getAttribute('data-f') === 'all')); });
     save(); fx('start', 15); render(); tick();
   });
-  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !$('overlay').hidden) closeSheet(); });
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape') return;
+    if (!$('lovl').hidden) closeListSheet(); else if (!$('overlay').hidden) closeSheet();
+  });
   document.querySelectorAll('input[name="mode"]').forEach(function (r) { r.addEventListener('change', function () { fx('tap', 8); showMode(); }); });
   document.querySelectorAll('.presets [data-d]').forEach(function (b) {
     b.addEventListener('click', function () {
@@ -884,7 +918,7 @@ label.btn { display: flex; align-items: center; justify-content: center; text-al
     document.querySelectorAll('.tab').forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); });
     render();
   });
-  document.addEventListener('visibilitychange', function () { if (document.hidden) syncSW(); else tick(); });
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) tick(); });
 
   try {
     if ('Notification' in window && Notification.permission === 'default') {
@@ -900,29 +934,9 @@ label.btn { display: flex; align-items: center; justify-content: center; text-al
     }
   } catch (e) {}
 
-  $('toneTest').addEventListener('click', function () {
-    audio(); stopSound();
-    var v = $('fTone').value;
-    if (v === 'custom' && customAudio) { customAudio.loop = false; customAudio.currentTime = 0; customAudio.play().catch(function () {}); }
-    else (ALARMS[v] || ALARMS.classic)();
-  });
-  $('fToneFile').addEventListener('change', function () {
-    var f = this.files[0]; this.value = '';
-    if (!f) return;
-    if (f.type && f.type.indexOf('audio') !== 0) { toast('اختار ملف صوتي.'); return; }
-    if (f.size > 5 * 1048576) { toast('الملف كبير. اختار نغمة أصغر من 5 ميجا.'); return; }
-    saveCustom(f, function (ok) {
-      fillTones();
-      if (ok) { $('fTone').value = 'custom'; toast('تمت إضافة نغمتك.'); } else toast('تعذّر حفظ النغمة على الجهاز.');
-    });
-  });
-  $('toneDel').addEventListener('click', function () { stopSound(); removeCustom(function () { fillTones(); toast('تم حذف نغمتك.'); }); });
-  loadCustom(fillTones);
-  try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) {}
-  try { navigator.serviceWorker.ready.then(syncSW); } catch (e) {}
   buildWheels();
   if (!load()) seed();
-  $('overlay').hidden = true;
+  $('overlay').hidden = true; $('lovl').hidden = true;
   render();
   tick();
   setInterval(tick, 250);
